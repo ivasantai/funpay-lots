@@ -171,9 +171,10 @@ class FunPayClient:
                 continue
             price_el = a.select_one(".tc-price")
             unit = _text(price_el.select_one(".unit")) if price_el else ""
-            price = price_el.get("data-s") if price_el else ""
+            # Видимая цена (как на сайте); data-s — машинное значение для сортировки, бывает с лишними знаками.
+            price = _text(price_el).replace(unit, "").strip() if price_el else ""
             if not price and price_el:
-                price = _text(price_el).replace(unit, "").strip()
+                price = price_el.get("data-s", "")
             server = _text(a.select_one(".tc-server"))
             classes = a.get("class", [])
             lots.append({
