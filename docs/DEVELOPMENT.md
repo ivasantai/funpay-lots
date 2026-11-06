@@ -9,12 +9,14 @@ py -m venv .venv
 .venv\Scripts\python app.py
 ```
 
-macOS:
+macOS и Linux:
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python app.py
 ```
+На Linux `requirements.txt` ставит pywebview с Qt (PyQt6 + PyQt6-WebEngine); могут понадобиться системные
+библиотеки из шага «System libraries for Qt» в `.github/workflows/build.yml`.
 
 Переменная окружения `FPL_DEBUG=1` запускает окно в режиме отладки pywebview (с инструментами разработчика).
 
@@ -31,17 +33,28 @@ python -m http.server 8765 -d ui
 ```bash
 pyinstaller --noconfirm funpay_lots.spec
 ```
-- Windows → `dist/FunPayLots.exe` (один файл, ~14 МБ).
-- macOS → `dist/FunPay Lots.app` (собирать на маке с Apple Silicon).
+- Windows → `dist/FunPayLots.exe` (один файл).
+- macOS → `dist/FunPay Lots.app` под архитектуру Python, на котором собираете (arm64 или x86_64).
+- Linux → `dist/FunPayLots` (один файл с QtWebEngine).
 
-С Windows собрать macOS-версию нельзя — для этого есть GitHub Actions.
+Проверка сборки без окна: `FunPayLots --selftest` (код возврата 0 — все модули и файлы на месте).
+Каждая ОС собирается только на себе — для остальных есть GitHub Actions.
 
 ### GitHub Actions
-`.github/workflows/build.yml` собирает обе версии:
-- **вручную:** Actions → build → Run workflow — файлы появятся в артефактах запуска;
-- **по тегу `v*`:** дополнительно создаётся GitHub Release с `FunPayLots.exe` и `FunPayLots-macos-arm64.zip`.
+`.github/workflows/build.yml` собирает четыре версии:
 
-Раннеры: `windows-latest` и `macos-latest` (arm64).
+| Задача | Раннер | Результат |
+|---|---|---|
+| windows | `windows-latest` | `FunPayLots.exe` |
+| macos arm64 | `macos-latest` | `FunPayLots-macos-arm64.zip` |
+| macos x86_64 | `macos-15-intel` | `FunPayLots-macos-x86_64.zip` |
+| linux | `ubuntu-22.04` (старый glibc — шире совместимость) | `FunPayLots-linux-x86_64.tar.gz` |
+
+Для каждой: сборка → `--selftest` (падение ломает сборку) → пробный запуск окна на 20–25 секунд со
+скриншотом экрана (артефакт `smoke-*`, на результат не влияет — для визуальной проверки).
+
+- **вручную:** Actions → build → Run workflow — файлы и скриншоты в артефактах запуска;
+- **по тегу `v*`:** дополнительно создаётся GitHub Release со всеми четырьмя файлами.
 
 ## Выпуск новой версии
 Пользователи получают обновление автоматически, поэтому номер версии в теге, `app.py` и `.spec`
