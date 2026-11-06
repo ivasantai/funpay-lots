@@ -1,31 +1,32 @@
-# FunPay Lots
+<p align="center"><img src="assets/icon.png" width="128" alt="FunPay Lots"></p>
 
-Десктоп-приложение для управления своими лотами на FunPay: список, поиск, включение/выключение,
-создание, редактирование и удаление (в том числе массово). Windows 11 x64 и macOS (Apple Silicon).
+<h1 align="center">FunPay Lots</h1>
 
-## Ключ
-У FunPay нет официального API, поэтому «API-ключ» — это cookie **golden_key** вашего аккаунта:
-funpay.com → F12 → Application/Storage → Cookies → `golden_key`.
-Ключ хранится только локально: `%APPDATA%\FunPayLots\config.json` (Windows) или
-`~/Library/Application Support/FunPayLots/config.json` (macOS). Кнопка «Выйти» удаляет его.
+<p align="center">Десктоп-приложение для управления лотами на FunPay — Windows 11 x64 и macOS (Apple Silicon).</p>
 
-## Что умеет
-- Все свои лоты по разделам, включая неактивные (берутся со страниц `/lots/<раздел>/trade`).
-- Редактор строится из настоящей формы FunPay, поэтому поля конкретного раздела подтягиваются сами.
-- Новый лот: поиск раздела по всему каталогу FunPay или по ID.
-- Картинки сохраняются как есть; менять их пока нужно на сайте. Разделы валюты (chips) не поддерживаются.
+## Возможности
+- Все свои лоты по разделам, включая неактивные; поиск и фильтр по статусу.
+- Создание, редактирование и удаление лотов, включение/выключение одним переключателем.
+- Массовые действия: включить, выключить, удалить выбранные.
+- Редактор повторяет форму FunPay, поэтому поддерживаются поля любого раздела.
+- Вход по ключу аккаунта (`golden_key`), ключ хранится только на вашем компьютере.
 
-## Запуск из исходников
-```
+## Скачать
+[Releases](https://github.com/ivasantai/funpay-lots/releases):
+`FunPayLots.exe` для Windows, `FunPayLots-macos-arm64.zip` для Mac на M1–M4.
+
+## Документация
+- [Руководство пользователя](docs/USER_GUIDE.md): установка, где взять ключ, работа с лотами, частые проблемы.
+- [Устройство проекта](docs/ARCHITECTURE.md): архитектура, запросы к FunPay, формат данных.
+- [Разработка и сборка](docs/DEVELOPMENT.md): запуск из исходников, сборка, релизы, что делать, если FunPay изменил сайт.
+- [История изменений](CHANGELOG.md)
+
+## Быстрый старт для разработчика
+```bash
 python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt      # macOS: .venv/bin/pip
-.venv\Scripts\python app.py
+.venv/bin/pip install -r requirements.txt   # Windows: .venv\Scripts\pip
+.venv/bin/python app.py
 ```
-Интерфейс без Python на демо-данных: `python -m http.server -d ui`, затем открыть `/index.html?mock`.
 
-## Сборка
-- **Windows:** `pyinstaller --noconfirm funpay_lots.spec` → `dist/FunPayLots.exe`.
-- **macOS (M1/M2):** на маке та же команда → `dist/FunPay Lots.app`, или через GitHub Actions
-  (`.github/workflows/build.yml`: запуск вручную или по тегу `v*`, собирает обе версии).
-  Приложение не подписано: при первом запуске правый клик → «Открыть», либо
-  `xattr -dr com.apple.quarantine "/Applications/FunPay Lots.app"`.
+> У FunPay нет официального API: приложение работает через те же запросы, что и сайт, и может
+> потребовать правок, если FunPay изменит вёрстку.

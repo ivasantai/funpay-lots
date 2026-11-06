@@ -15,7 +15,7 @@ import webview
 from funpay_client import FunPayClient, FunPayError
 
 APP_NAME = "FunPay Lots"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 
 def resource(rel: str) -> Path:
