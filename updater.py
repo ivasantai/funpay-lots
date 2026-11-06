@@ -130,10 +130,22 @@ def _install_windows(info: dict, progress):
         if old.exists() and not exe.exists():
             old.rename(exe)
         raise
-    flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    _relaunch_windows(exe)
+
+
+def _relaunch_windows(exe: Path):
+    """Запускает новую версию так, чтобы она пережила выход текущего процесса.
+    Загрузчик PyInstaller держит процесс в job object, который при закрытии убивает всех потомков,
+    поэтому новый процесс выводим из job (CREATE_BREAKAWAY_FROM_JOB), а если job этого не разрешает —
+    запускаем через explorer.exe, как обычный двойной клик."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("_MEI") and k != "_PYI_APPLICATION_HOME_DIR"}
     env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"  # новый exe должен распаковаться заново, а не взять нашу папку
-    subprocess.Popen([str(exe)], creationflags=flags, close_fds=True, env=env, cwd=str(exe.parent))
+    base = getattr(subprocess, "DETACHED_PROCESS", 0x8) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x200)
+    breakaway = getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0x01000000)
+    try:
+        subprocess.Popen([str(exe)], creationflags=base | breakaway, close_fds=True, env=env, cwd=str(exe.parent))
+    except OSError:
+        subprocess.Popen(["explorer.exe", str(exe)], close_fds=True, env=env)
 
 
 def _install_macos(info: dict, progress):
