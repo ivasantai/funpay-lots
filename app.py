@@ -26,6 +26,16 @@ def resource(rel: str) -> Path:
     return base / rel
 
 
+def page_html() -> str:
+    """Интерфейс отдаётся в окно строкой, а не через встроенный HTTP-сервер pywebview:
+    сервер при запуске резолвит имя компьютера, и macOS 15 из-за этого спрашивает доступ к локальной сети.
+    Иконка встраивается в страницу как data URI."""
+    import base64
+    html = resource("ui/index.html").read_text(encoding="utf-8")
+    icon = "data:image/png;base64," + base64.b64encode(resource("ui/icon.png").read_bytes()).decode()
+    return html.replace('src="icon.png"', f'src="{icon}"').replace('href="icon.png"', f'href="{icon}"')
+
+
 def config_dir() -> Path:
     if sys.platform == "darwin":
         d = Path.home() / "Library" / "Application Support" / "FunPayLots"
@@ -319,11 +329,29 @@ def main():
         return
     api = Api()
     api._window = webview.create_window(
-        APP_NAME, url=str(resource("ui/index.html")), js_api=api,
+        APP_NAME, html=page_html(), js_api=api,
         width=1240, height=800, min_size=(900, 600), background_color="#0f1115",
     )
-    webview.start(debug=bool(os.environ.get("FPL_DEBUG")), gui=gui_backend(), icon=str(resource("ui/icon.png")))
+    # Иконку окна pywebview берёт только на Linux (Qt). На Windows параметр ждёт .ico и падает на .png,
+    # а иконка там и на macOS и так берётся из exe/.app.
+    icon = str(resource("ui/icon.png")) if sys.platform.startswith("linux") else None
+    webview.start(debug=bool(os.environ.get("FPL_DEBUG")), gui=gui_backend(), icon=icon)
+
+
+def run():
+    """Точка входа: ошибки запуска пишутся в app.log (у собранного приложения нет консоли)."""
+    import logging
+    log_path = config_dir() / "app.log"
+    logging.basicConfig(filename=str(log_path), level=logging.WARNING, encoding="utf-8",
+                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    try:
+        main()
+    except SystemExit:
+        raise
+    except BaseException:
+        logging.getLogger("funpay-lots").critical("Сбой при запуске:\n%s", traceback.format_exc())
+        raise
 
 
 if __name__ == "__main__":
-    main()
+    run()

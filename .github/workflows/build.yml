@@ -33,6 +33,7 @@ jobs:
           $bmp.Save("smoke-windows.png")
           "alive after 20s: " + (-not $p.HasExited)
           Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          Get-Content "$env:APPDATA\FunPayLots\app.log" -ErrorAction SilentlyContinue
       - uses: actions/upload-artifact@v4
         with: { name: FunPayLots-windows-x64, path: dist/FunPayLots.exe }
       - uses: actions/upload-artifact@v4
