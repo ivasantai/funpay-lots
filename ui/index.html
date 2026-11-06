@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FunPay Lots</title>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --panel2:#f0f2f5; --line:#e2e5ea; --text:#1b1f27; --muted:#6b7280;
+  --accent:#2f6fed; --accent-ink:#fff; --danger:#d93a3a; --ok:#1f9d5a; --warn:#c98a10;
+  --shadow:0 10px 30px rgba(15,20,30,.12); --r:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --text:#e7e9ee; --muted:#8b93a3;
+    --accent:#4b83f5; --danger:#ef5a5a; --ok:#3cc47c; --warn:#e3a72f; --shadow:0 10px 30px rgba(0,0,0,.45);}
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.primary:hover{filter:brightness(1.08)}
+button.danger{color:var(--danger)}
+button.danger.fill{background:var(--danger);border-color:var(--danger);color:#fff}
+button.ghost{border-color:transparent;background:transparent}
+button.ghost:hover{background:var(--panel2)}
+button:disabled{opacity:.5;cursor:default}
+input[type=text],input[type=password],input[type=search],select,textarea{
+  width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
+textarea{resize:vertical;min-height:90px}
+.hidden{display:none!important}
+.muted{color:var(--muted)}
+.row{display:flex;align-items:center;gap:8px}
+.spacer{flex:1}
+
+/* login */
+#login{height:100%;display:grid;place-items:center;padding:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:28px;width:min(460px,100%)}
+.card h1{margin:0 0 4px;font-size:22px}
+.card p{margin:0 0 18px}
+.field{margin-bottom:14px}
+.field>label{display:block;font-weight:600;margin-bottom:6px}
+.hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+details.help{margin-top:14px;font-size:13px;color:var(--muted)}
+details.help summary{cursor:pointer;color:var(--text)}
+details.help ol{padding-left:18px;margin:8px 0 0}
+.err{color:var(--danger);font-size:13px;min-height:18px;margin-top:8px}
+
+/* main */
+#main{height:100%;display:grid;grid-template-rows:auto 1fr}
+header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.logo{font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px}
+.logo i{width:22px;height:22px;border-radius:6px;background:var(--accent);display:inline-block}
+.acc{color:var(--muted);font-size:13px}
+.acc b{color:var(--text)}
+.body{display:grid;grid-template-columns:260px 1fr;min-height:0}
+aside{border-right:1px solid var(--line);overflow:auto;padding:10px;background:var(--panel)}
+.cat{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;user-select:none}
+.cat:hover{background:var(--panel2)}
+.cat.sel{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-weight:600}
+.cat .n{margin-left:auto;font-size:12px;color:var(--muted);background:var(--panel2);border-radius:10px;padding:1px 8px}
+.cat .warn{color:var(--warn)}
+.side-title{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:12px 10px 4px}
+section.list{display:grid;grid-template-rows:auto auto 1fr;min-height:0}
+.toolbar{display:flex;gap:8px;align-items:center;padding:12px 16px}
+.toolbar input[type=search]{max-width:380px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:7px 11px;background:var(--panel)}
+.seg button.on{background:var(--panel2);font-weight:600}
+.bulk{display:flex;gap:8px;align-items:center;padding:0 16px 10px}
+.table-wrap{overflow:auto;padding:0 16px 16px}
+table{width:100%;border-collapse:separate;border-spacing:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:600;background:var(--panel2);position:sticky;top:0;z-index:1}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:var(--panel2)}
+td.title{max-width:0;width:100%}
+td.title .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+td.title .sub{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td.num{white-space:nowrap;text-align:right}
+tr.off td.title .t{color:var(--muted)}
+.actions{white-space:nowrap;text-align:right}
+.actions button{padding:5px 8px}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+.cat-err{margin:0 16px 10px;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,var(--warn) 15%,transparent);font-size:13px}
+
+/* switch */
+.sw{position:relative;width:34px;height:20px;display:inline-block;flex:none}
+.sw input{opacity:0;width:0;height:0}
+.sw span{position:absolute;inset:0;background:var(--line);border-radius:20px;transition:.15s;cursor:pointer}
+.sw span:before{content:"";position:absolute;width:14px;height:14px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s}
+.sw input:checked+span{background:var(--ok)}
+.sw input:checked+span:before{transform:translateX(14px)}
+.sw input:disabled+span{opacity:.5}
+
+/* drawer & modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:20}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(640px,100%);background:var(--panel);border-left:1px solid var(--line);box-shadow:var(--shadow);z-index:21;display:grid;grid-template-rows:auto 1fr auto}
+.drawer .hd,.drawer .ft{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.drawer .ft{border-top:1px solid var(--line);border-bottom:0}
+.drawer .hd h2{margin:0;font-size:16px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drawer .bd{overflow:auto;padding:16px 18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chk{display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer}
+.chk input{width:16px;height:16px}
+.tag{font-size:11px;padding:1px 6px;border-radius:6px;background:var(--panel2);color:var(--muted);margin-left:6px;font-weight:500}
+details.en{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:6px 0 14px}
+details.en summary{cursor:pointer;font-weight:600}
+details.en[open] summary{margin-bottom:10px}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100% - 32px));max-height:min(640px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);z-index:31;display:grid;grid-template-rows:auto 1fr auto}
+.modal .hd{padding:14px 18px;font-weight:700;font-size:16px}
+.modal .bd{padding:0 18px;overflow:auto}
+.modal .ft{padding:14px 18px;display:flex;gap:8px;justify-content:flex-end}
+.overlay.top{z-index:30}
+.pick{padding:7px 10px;border-radius:8px;cursor:pointer;display:flex;gap:8px}
+.pick:hover{background:var(--panel2)}
+.pick .g{color:var(--muted);font-size:12.5px;margin-left:auto;text-align:right}
+
+/* toast + spinner */
+#toasts{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:50;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{background:var(--text);color:var(--bg);padding:9px 14px;border-radius:9px;box-shadow:var(--shadow);max-width:560px;font-size:13.5px}
+.toast.bad{background:var(--danger);color:#fff}
+.spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes sp{to{transform:rotate(360deg)}}
+.loading{padding:40px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- ВХОД -->
+<div id="login" class="hidden">
+  <div class="card">
+    <h1>FunPay Lots</h1>
+    <p class="muted">Управление лотами вашего аккаунта FunPay</p>
+    <div class="field">
+      <label for="key">Ключ аккаунта (golden_key)</label>
+      <div class="row">
+        <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="32 символа из букв и цифр">
+        <button id="keyShow" class="ghost" title="Показать">👁</button>
+      </div>
+      <label class="chk hint"><input id="remember" type="checkbox" checked> Запомнить на этом компьютере</label>
+    </div>
+    <button id="loginBtn" class="primary" style="width:100%">Войти</button>
+    <div id="loginErr" class="err"></div>
+    <details class="help">
+      <summary>Где взять ключ?</summary>
+      <ol>
+        <li>Откройте funpay.com в браузере и войдите в аккаунт.</li>
+        <li>Откройте инструменты разработчика (F12 или ⌥⌘I на Mac).</li>
+        <li>Application (Chrome) / Storage (Safari, Firefox) → Cookies → https://funpay.com.</li>
+        <li>Скопируйте значение cookie <b>golden_key</b>.</li>
+      </ol>
+      <div class="hint">Ключ даёт полный доступ к аккаунту — не передавайте его никому. Приложение хранит его только локально.</div>
+    </details>
+  </div>
+</div>
+
+<!-- ОСНОВНОЙ ЭКРАН -->
+<div id="main" class="hidden">
+  <header>
+    <div class="logo"><i></i>FunPay Lots</div>
+    <div class="acc" id="acc"></div>
+    <div class="spacer"></div>
+    <button id="refreshBtn">⟳ Обновить</button>
+    <button id="newBtn" class="primary">＋ Новый лот</button>
+    <button id="logoutBtn" class="ghost" title="Выйти и забыть ключ">Выйти</button>
+  </header>
+  <div class="body">
+    <aside id="cats"></aside>
+    <section class="list">
+      <div class="toolbar">
+        <input id="q" type="search" placeholder="Поиск по названию…">
+        <div class="seg" id="flt">
+          <button data-f="all" class="on">Все</button>
+          <button data-f="on">Активные</button>
+          <button data-f="off">Неактивные</button>
+        </div>
+        <div class="spacer"></div>
+        <span class="muted" id="count"></span>
+      </div>
+      <div class="bulk hidden" id="bulk">
+        <b id="bulkN"></b>
+        <button data-bulk="on">Включить</button>
+        <button data-bulk="off">Выключить</button>
+        <button data-bulk="del" class="danger">Удалить</button>
+        <button data-bulk="clear" class="ghost">Снять выделение</button>
+      </div>
+      <div class="table-wrap" id="tableWrap"></div>
+    </section>
+  </div>
+</div>
+
+<div id="layer"></div>
+<div id="toasts"></div>
+
+<script>
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const S = { cats: [], sel: "all", q: "", f: "all", picked: new Set(), games: null, busy: false };
+
+/* ---------- мост к Python ---------- */
+let API;
+async function call(name, ...args){
+  const r = await API[name](...args);
+  if (!r || !r.ok) throw new Error((r && r.error) || "Неизвестная ошибка");
+  return r.data;
+}
+
+/* ---------- UI helpers ---------- */
+function toast(msg, bad=false){
+  const t = document.createElement("div");
+  t.className = "toast" + (bad ? " bad" : "");
+  t.textContent = msg;
+  $("#toasts").append(t);
+  setTimeout(() => t.remove(), bad ? 6500 : 3000);
+}
+function confirmBox(title, text, okLabel="Удалить"){
+  return new Promise(res => {
+    const L = $("#layer");
+    const wrap = document.createElement("div");
+    wrap.innerHTML = `<div class="overlay top"></div>
+      <div class="modal" role="dialog"><div class="hd">${esc(title)}</div>
+      <div class="bd"><p>${esc(text)}</p></div>
+      <div class="ft"><button data-a="no">Отмена</button><button data-a="yes" class="danger fill">${esc(okLabel)}</button></div></div>`;
+    L.append(wrap);
+    const done = v => { wrap.remove(); res(v); };
+    wrap.querySelector(".overlay").onclick = () => done(false);
+    wrap.querySelector('[data-a=no]').onclick = () => done(false);
+    wrap.querySelector('[data-a=yes]').onclick = () => done(true);
+  });
+}
+
+/* ---------- вход ---------- */
+function showLogin(err=""){
+  $("#main").classList.add("hidden");
+  $("#login").classList.remove("hidden");
+  $("#loginErr").textContent = err;
+  $("#key").focus();
+}
+async function doLogin(key, remember){
+  const btn = $("#loginBtn");
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Вход…';
+  $("#loginErr").textContent = "";
+  try{
+    const acc = await call("login", key, remember);
+    $("#acc").innerHTML = `<b>${esc(acc.username)}</b>${acc.balance ? " · " + esc(acc.balance) : ""}`;
+    $("#login").classList.add("hidden");
+    $("#main").classList.remove("hidden");
+    $("#key").value = "";
+    await loadLots();
+  }catch(e){ showLogin(e.message); }
+  finally{ btn.disabled = false; btn.textContent = "Войти"; }
+}
+$("#loginBtn").onclick = () => doLogin($("#key").value, $("#remember").checked);
+$("#key").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
+$("#keyShow").onclick = () => { const k = $("#key"); k.type = k.type === "password" ? "text" : "password"; };
+$("#logoutBtn").onclick = async () => {
+  if (!await confirmBox("Выйти?", "Сохранённый ключ будет удалён с этого компьютера.", "Выйти")) return;
+  await call("logout"); S.cats = []; showLogin();
+};
+
+/* ---------- список ---------- */
+async function loadLots(){
+  $("#tableWrap").innerHTML = '<div class="loading"><span class="spin"></span> Загружаю лоты…</div>';
+  $("#refreshBtn").disabled = true;
+  try{
+    S.cats = await call("lots");
+    S.picked.clear();
+    if (S.sel !== "all" && !S.cats.some(c => c.node === S.sel)) S.sel = "all";
+    render();
+  }catch(e){
+    $("#tableWrap").innerHTML = `<div class="empty">Не удалось загрузить: ${esc(e.message)}</div>`;
+  }finally{ $("#refreshBtn").disabled = false; }
+}
+$("#refreshBtn").onclick = loadLots;
+
+function allLots(){ return S.cats.flatMap(c => c.lots.map(l => ({...l, cat: c.name}))); }
+function visibleLots(){
+  let ls = S.sel === "all" ? allLots() : allLots().filter(l => l.node === S.sel);
+  if (S.f === "on") ls = ls.filter(l => l.active);
+  if (S.f === "off") ls = ls.filter(l => !l.active);
+  const q = S.q.trim().toLowerCase();
+  if (q) ls = ls.filter(l => (l.title + " " + l.server + " " + l.id).toLowerCase().includes(q));
+  return ls;
+}
+
+function render(){
+  const total = allLots().length;
+  let h = `<div class="cat ${S.sel==="all"?"sel":""}" data-node="all">Все лоты<span class="n">${total}</span></div>
+           <div class="side-title">Разделы</div>`;
+  for (const c of S.cats){
+    h += `<div class="cat ${S.sel===c.node?"sel":""}" data-node="${c.node}" title="${esc(c.name)} · #${c.node}">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</span>
+      ${c.error ? '<span class="warn" title="Ошибка загрузки">⚠</span>' : ""}<span class="n">${c.lots.length}</span></div>`;
+  }
+  if (!S.cats.length) h += `<div class="muted" style="padding:8px 10px;font-size:13px">Лотов пока нет. Нажмите «Новый лот».</div>`;
+  $("#cats").innerHTML = h;
+  $$("#cats .cat").forEach(el => el.onclick = () => {
+    S.sel = el.dataset.node === "all" ? "all" : +el.dataset.node; S.picked.clear(); render();
+  });
+  renderTable();
+}
+
+function renderTable(){
+  const ls = visibleLots();
+  $("#count").textContent = `${ls.length} шт.`;
+  const cat = S.sel !== "all" ? S.cats.find(c => c.node === S.sel) : null;
+  let h = "";
+  if (cat && cat.error) h += `<div class="cat-err">⚠ ${esc(cat.error)} <button class="ghost" id="forgetCat">Убрать раздел из списка</button></div>`;
+  if (!ls.length){
+    h += `<div class="empty">${S.q || S.f!=="all" ? "Ничего не найдено" : "В этом разделе нет лотов"}</div>`;
+  } else {
+    const allChecked = ls.every(l => S.picked.has(l.id));
+    h += `<table><thead><tr>
+      <th style="width:32px"><input type="checkbox" id="pickAll" ${allChecked?"checked":""}></th>
+      <th style="width:52px">Вкл.</th><th>Название</th><th class="num">Наличие</th><th class="num">Цена</th><th></th>
+    </tr></thead><tbody>`;
+    for (const l of ls){
+      const sub = [S.sel==="all" ? l.cat : "", l.server, "#" + l.id].filter(Boolean).join(" · ");
+      h += `<tr class="${l.active?"":"off"}" data-id="${l.id}" data-node="${l.node}">
+        <td><input type="checkbox" class="pick-one" ${S.picked.has(l.id)?"checked":""}></td>
+        <td><label class="sw"><input type="checkbox" class="act" ${l.active?"checked":""}><span></span></label></td>
+        <td class="title"><div class="t" data-a="edit">${esc(l.title || "(без названия)")}</div><div class="sub">${esc(sub)}</div></td>
+        <td class="num">${esc(l.amount || "—")}</td>
+        <td class="num">${esc(l.price)} ${esc(l.unit)}</td>
+        <td class="actions">
+          <button class="ghost" data-a="edit" title="Редактировать">✎</button>
+          <button class="ghost" data-a="open" title="Открыть на сайте">↗</button>
+          <button class="ghost danger" data-a="del" title="Удалить">🗑</button>
+        </td></tr>`;
+    }
+    h += "</tbody></table>";
+  }
+  $("#tableWrap").innerHTML = h;
+  updateBulk();
+
+  const fc = $("#forgetCat");
+  if (fc) fc.onclick = async () => { await call("forget_category", S.sel); S.sel = "all"; loadLots(); };
+  const pa = $("#pickAll");
+  if (pa) pa.onchange = () => { ls.forEach(l => pa.checked ? S.picked.add(l.id) : S.picked.delete(l.id)); renderTable(); };
+  $$("#tableWrap tbody tr").forEach(tr => {
+    const id = +tr.dataset.id, node = +tr.dataset.node;
+    const lot = ls.find(l => l.id === id);
+    tr.querySelector(".pick-one").onchange = e => { e.target.checked ? S.picked.add(id) : S.picked.delete(id); updateBulk(); };
+    tr.querySelector(".act").onchange = e => toggleActive(lot, e.target);
+    tr.querySelectorAll("[data-a]").forEach(b => b.onclick = () => {
+      const a = b.dataset.a;
+      if (a === "edit") openEditor(node, id);
+      if (a === "open") call("open_url", `https://funpay.com/lots/offer?id=${id}`);
+      if (a === "del") deleteLots([lot]);
+    });
+  });
+}
+
+function updateBulk(){
+  const n = S.picked.size;
+  $("#bulk").classList.toggle("hidden", !n);
+  $("#bulkN").textContent = `Выбрано: ${n}`;
+}
+
+$("#q").addEventListener("input", e => { S.q = e.target.value; renderTable(); });
+$$("#flt button").forEach(b => b.onclick = () => {
+  $$("#flt button").forEach(x => x.classList.toggle("on", x === b)); S.f = b.dataset.f; renderTable();
+});
+
+async function toggleActive(lot, input){
+  input.disabled = true;
+  try{
+    await call("set_active", lot.node, lot.id, input.checked);
+    lot.active = input.checked;
+    for (const c of S.cats) for (const l of c.lots) if (l.id === lot.id) l.active = input.checked;
+    toast(input.checked ? "Лот включён" : "Лот выключен");
+    renderTable();
+  }catch(e){ input.checked = !input.checked; toast(e.message, true); }
+  finally{ input.disabled = false; }
+}
+
+async function deleteLots(lots){
+  const text = lots.length === 1 ? `«${lots[0].title}» будет удалён с FunPay без возможности восстановления.`
+                                 : `${lots.length} лотов будут удалены с FunPay без возможности восстановления.`;
+  if (!await confirmBox(lots.length === 1 ? "Удалить лот?" : "Удалить лоты?", text)) return false;
+  let ok = 0;
+  for (const l of lots){
+    try{ await call("delete", l.node, l.id); ok++; }
+    catch(e){ toast(`#${l.id}: ${e.message}`, true); }
+  }
+  if (ok) toast(ok === 1 ? "Лот удалён" : `Удалено: ${ok}`);
+  await loadLots();
+  return true;
+}
+
+$$("#bulk [data-bulk]").forEach(b => b.onclick = async () => {
+  const lots = allLots().filter(l => S.picked.has(l.id));
+  const a = b.dataset.bulk;
+  if (a === "clear"){ S.picked.clear(); renderTable(); return; }
+  if (a === "del"){ await deleteLots(lots); return; }
+  const want = a === "on";
+  const todo = lots.filter(l => l.active !== want);
+  $$("#bulk button").forEach(x => x.disabled = true);
+  let ok = 0;
+  for (const l of todo){
+    try{ await call("set_active", l.node, l.id, want); ok++; }
+    catch(e){ toast(`#${l.id}: ${e.message}`, true); }
+  }
+  $$("#bulk button").forEach(x => x.disabled = false);
+  toast(`${want ? "Включено" : "Выключено"}: ${ok}`);
+  await loadLots();
+});
+
+/* ---------- редактор ---------- */
+function fieldHtml(f, i){
+  const id = "f" + i;
+  const tag = f.conditional ? '<span class="tag" title="На сайте это поле появляется в зависимости от других полей">доп.</span>' : "";
+  const label = `<label for="${id}">${esc(f.label)}${tag}</label>`;
+  if (f.kind === "checkbox")
+    return `<label class="chk"><input id="${id}" data-i="${i}" type="checkbox" ${f.value?"checked":""}> ${esc(f.label)}</label>`;
+  if (f.kind === "select")
+    return `<div class="field">${label}<select id="${id}" data-i="${i}">${
+      f.options.map(o => `<option value="${esc(o.value)}" ${o.value===f.value?"selected":""}>${esc(o.text || "—")}</option>`).join("")}</select></div>`;
+  if (f.kind === "textarea"){
+    const rows = f.name === "secrets" ? 6 : (f.name.includes("desc") ? 8 : 3);
+    const hint = f.name === "secrets" ? '<div class="hint">Каждая строка — отдельный товар для автовыдачи.</div>' : "";
+    return `<div class="field">${label}<textarea id="${id}" data-i="${i}" rows="${rows}">${esc(f.value)}</textarea>${hint}</div>`;
+  }
+  return `<div class="field">${label}<input id="${id}" data-i="${i}" type="text" value="${esc(f.value)}"></div>`;
+}
+
+async function openEditor(node, offer=null, categoryName=""){
+  const L = $("#layer");
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `<div class="overlay"></div><div class="drawer">
+    <div class="hd"><h2>${offer ? "Редактирование лота" : "Новый лот"}</h2><button class="ghost" data-a="x">✕</button></div>
+    <div class="bd"><div class="loading"><span class="spin"></span> Загружаю форму…</div></div>
+    <div class="ft"></div></div>`;
+  L.append(wrap);
+  let dirty = false;
+  const close = async () => {
+    if (dirty && !await confirmBox("Закрыть без сохранения?", "Изменения будут потеряны.", "Закрыть")) return;
+    wrap.remove();
+  };
+  wrap.querySelector(".overlay").onclick = close;
+  wrap.querySelector('[data-a=x]').onclick = close;
+
+  let form;
+  try{ form = await call("form", node, offer); }
+  catch(e){ wrap.querySelector(".bd").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+
+  const F = form.fields;
+  const cat = S.cats.find(c => c.node === node);
+  categoryName = categoryName || (cat && cat.name) || "";
+  const main = [], en = [], tail = [];
+  F.forEach((f, i) => {
+    if (f.kind === "system" || f.kind === "hidden") return;
+    if (f.locale === "en") en.push([f, i]);
+    else if (["price","amount","active","auto_delivery","secrets","deactivate_after_sale"].includes(f.name) || f.kind === "checkbox") tail.push([f, i]);
+    else main.push([f, i]);
+  });
+  const by = n => tail.find(([f]) => f.name === n);
+  const price = by("price"), amount = by("amount");
+  const rest = tail.filter(x => x !== price && x !== amount);
+  const imgs = F.find(f => f.name === "fields[images]");
+  let h = `<div class="muted" style="margin-bottom:12px">${esc(categoryName || form.title)}${offer ? ` · #${offer}` : ""}</div>`;
+  h += main.map(([f,i]) => fieldHtml(f,i)).join("");
+  if (price || amount) h += `<div class="grid2">${price?fieldHtml(...price):""}${amount?fieldHtml(...amount):""}</div>`;
+  h += rest.map(([f,i]) => fieldHtml(f,i)).join("");
+  if (en.length) h += `<details class="en"><summary>English version</summary>${en.map(([f,i]) => fieldHtml(f,i)).join("")}</details>`;
+  if (imgs && imgs.value) h += `<div class="hint">Картинок у лота: ${imgs.value.split(",").filter(Boolean).length} (сохраняются как есть; менять картинки — на сайте).</div>`;
+  wrap.querySelector(".bd").innerHTML = h;
+  wrap.querySelector(".bd").addEventListener("input", () => dirty = true);
+  wrap.querySelector(".bd").addEventListener("change", () => dirty = true);
+
+  const ft = wrap.querySelector(".ft");
+  ft.innerHTML = `${offer ? '<button class="danger" data-a="del">Удалить</button>' : ""}
+    ${offer ? '<button class="ghost" data-a="open">Открыть на сайте ↗</button>' : ""}
+    <div class="spacer"></div><button data-a="cancel">Отмена</button>
+    <button class="primary" data-a="save">${offer ? "Сохранить" : "Создать лот"}</button>`;
+  ft.querySelector('[data-a=cancel]').onclick = close;
+  const openBtn = ft.querySelector('[data-a=open]');
+  if (openBtn) openBtn.onclick = () => call("open_url", `https://funpay.com/lots/offer?id=${offer}`);
+  const delBtn = ft.querySelector('[data-a=del]');
+  if (delBtn) delBtn.onclick = async () => {
+    const title = (F.find(f => f.name === "fields[summary][ru]") || {}).value || `#${offer}`;
+    if (await deleteLots([{ node, id: offer, title }])) wrap.remove();
+  };
+  ft.querySelector('[data-a=save]').onclick = async e => {
+    const btn = e.currentTarget;
+    $$("[data-i]", wrap).forEach(el => {
+      const f = F[+el.dataset.i];
+      f.value = el.type === "checkbox" ? el.checked : el.value;
+    });
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Сохраняю…';
+    try{
+      await call("save", node, F, categoryName);
+      toast(offer ? "Лот сохранён" : "Лот создан");
+      wrap.remove();
+      if (!offer) S.sel = node;
+      loadLots();
+    }catch(err){
+      toast(err.message, true);
+      btn.disabled = false; btn.textContent = offer ? "Сохранить" : "Создать лот";
+    }
+  };
+}
+
+/* ---------- выбор раздела для нового лота ---------- */
+$("#newBtn").onclick = async () => {
+  const L = $("#layer");
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `<div class="overlay top"></div><div class="modal">
+    <div class="hd">В каком разделе создать лот?</div>
+    <div class="bd"><input type="search" id="pq" placeholder="Игра или раздел, например «Telegram» или ID раздела" style="margin-bottom:10px">
+      <div id="plist"><div class="loading"><span class="spin"></span></div></div></div>
+    <div class="ft"><button data-a="no">Отмена</button></div></div>`;
+  L.append(wrap);
+  const close = () => wrap.remove();
+  wrap.querySelector(".overlay").onclick = close;
+  wrap.querySelector('[data-a=no]').onclick = close;
+  $("#pq", wrap).focus();
+  const mine = S.cats.map(c => ({ node: c.node, name: c.name, game: "мой раздел" }));
+  if (!S.games){
+    try{ S.games = await call("games"); } catch(e){ S.games = []; toast(e.message, true); }
+  }
+  const all = S.games.flatMap(g => g.subs.map(s => ({ node: s.node, name: s.name, game: g.game })));
+  const draw = () => {
+    const q = $("#pq", wrap).value.trim().toLowerCase();
+    let items;
+    if (!q) items = mine.length ? mine : all.slice(0, 60);
+    else {
+      items = [...mine, ...all].filter(x => (x.game + " " + x.name + " " + x.node).toLowerCase().includes(q));
+      if (/^\d+$/.test(q) && !items.some(x => String(x.node) === q)) items.unshift({ node: +q, name: `Раздел #${q}`, game: "по ID" });
+    }
+    const seen = new Set();
+    items = items.filter(x => !seen.has(x.node) && seen.add(x.node)).slice(0, 150);
+    $("#plist", wrap).innerHTML = (!q && mine.length ? '<div class="side-title" style="margin-left:0">Мои разделы — или начните вводить для поиска по всему каталогу</div>' : "") +
+      (items.map(x => `<div class="pick" data-node="${x.node}" data-name="${esc(x.game==="мой раздел"||x.game==="по ID" ? x.name : x.game + " · " + x.name)}">
+        <span>${esc(x.name)}</span><span class="g">${esc(x.game)} · #${x.node}</span></div>`).join("") || '<div class="empty">Ничего не найдено</div>');
+    $$(".pick", wrap).forEach(p => p.onclick = () => { close(); openEditor(+p.dataset.node, null, p.dataset.name); });
+  };
+  $("#pq", wrap).addEventListener("input", draw);
+  draw();
+  $("#pq", wrap).focus();
+};
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape"){
+    const top = $("#layer").lastElementChild;
+    if (top){ const x = top.querySelector('[data-a=x],[data-a=no],[data-a=cancel]'); x ? x.click() : top.remove(); }
+  }
+});
+
+/* ---------- старт ---------- */
+async function boot(){
+  try{
+    const st = await call("state");
+    if (st.has_key){ $("#login").classList.add("hidden"); await doLogin(null, true); }
+    else showLogin();
+  }catch(e){ showLogin(e.message); }
+}
+if (window.pywebview && window.pywebview.api) { API = window.pywebview.api; boot(); }
+else window.addEventListener("pywebviewready", () => { API = window.pywebview.api; boot(); });
+// Режим просмотра в обычном браузере (для разработки): ui/index.html?mock
+if (location.search.includes("mock")) {
+  const s = document.createElement("script"); s.src = "mock.js"; s.onload = () => { API = window.MOCK_API; boot(); };
+  document.head.append(s);
+}
+</script>
+</body>
+</html>
