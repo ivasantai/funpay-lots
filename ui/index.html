@@ -159,6 +159,13 @@ a.lnk:hover{text-decoration:underline}
 .warnbox{padding:10px 12px;border-radius:9px;background:color-mix(in srgb,var(--warn) 14%,transparent);font-size:13px;margin-bottom:12px}
 .inrow{display:flex;gap:8px}
 
+/* нейросеть */
+.ai-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.ai-panel{border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));background:color-mix(in srgb,var(--accent) 6%,var(--panel));border-radius:10px;padding:12px;margin-bottom:16px}
+.ai-panel textarea{min-height:80px}
+.flash{animation:fl 1.6s ease}
+@keyframes fl{0%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 55%,transparent)}100%{box-shadow:none}}
+
 /* обновление */
 #upd{position:fixed;right:16px;bottom:16px;z-index:40;width:min(360px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:14px 16px}
 #upd h4{margin:0 0 4px;font-size:15px}
@@ -210,6 +217,7 @@ a.lnk:hover{text-decoration:underline}
       <button id="newBtn" class="primary">＋ Новый лот</button>
     </span>
     <button id="verBtn" class="ghost ver" title="Проверить обновления"></button>
+    <button id="setBtn" class="ghost" title="Настройки">⚙</button>
     <button id="logoutBtn" class="ghost" title="Выйти и забыть ключ">Выйти</button>
   </header>
   <div id="viewFin" class="hidden"><div class="fin-wrap" id="fin"></div></div>
@@ -511,14 +519,67 @@ async function openEditor(node, offer=null, categoryName=""){
   const rest = tail.filter(x => x !== price && x !== amount);
   const imgs = F.find(f => f.name === "fields[images]");
   let h = `<div class="muted" style="margin-bottom:12px">${esc(categoryName || form.title)}${offer ? ` · #${offer}` : ""}</div>`;
+  h += `<div class="ai-bar"><button data-ai="fill">✨ Заполнить с ИИ</button>${en.length ? '<button data-ai="tr">🌐 Перевести на английский</button>' : ""}</div>
+        <div class="ai-panel hidden" id="aiPanel">
+          <div class="field"><label>Что продаёте?</label>
+            <textarea id="aiBrief" placeholder="Например: аренда личного аккаунта ChatGPT Plus на 3 часа, выдача сразу после оплаты, +1 час за отзыв. Можно коротко — нейросеть сама оформит текст."></textarea>
+            <div class="hint">Учтутся раздел, параметры лота и уже написанный текст (как пример вашего стиля).</div></div>
+          <label class="chk"><input type="checkbox" id="aiPay"> Написать сообщение покупателю после оплаты</label>
+          ${en.length ? '<label class="chk"><input type="checkbox" id="aiEn" checked> Сразу сделать английскую версию</label>' : ""}
+          <div class="row" style="margin-top:8px"><div class="spacer"></div><button class="ghost" data-ai="close">Отмена</button><button class="primary" data-ai="gen">Сгенерировать</button></div>
+        </div>`;
   h += main.map(([f,i]) => fieldHtml(f,i)).join("");
   if (price || amount) h += `<div class="grid2">${price?fieldHtml(...price):""}${amount?fieldHtml(...amount):""}</div>`;
   h += rest.map(([f,i]) => fieldHtml(f,i)).join("");
   if (en.length) h += `<details class="en"><summary>English version</summary>${en.map(([f,i]) => fieldHtml(f,i)).join("")}</details>`;
   if (imgs && imgs.value) h += `<div class="hint">Картинок у лота: ${imgs.value.split(",").filter(Boolean).length} (сохраняются как есть; менять картинки — на сайте).</div>`;
   wrap.querySelector(".bd").innerHTML = h;
-  wrap.querySelector(".bd").addEventListener("input", () => dirty = true);
-  wrap.querySelector(".bd").addEventListener("change", () => dirty = true);
+  const bdEl = wrap.querySelector(".bd");
+  bdEl.addEventListener("input", e => { if (e.target.dataset.i) dirty = true; });
+  bdEl.addEventListener("change", e => { if (e.target.dataset.i) dirty = true; });
+
+  // --- нейросеть ---
+  const inputOf = name => { const i = F.findIndex(f => f.name === name); return i < 0 ? null : $(`[data-i="${i}"]`, wrap); };
+  const val = name => { const el = inputOf(name); return el ? el.value : ""; };
+  const put = (name, v) => {
+    const el = inputOf(name); if (!el || v == null) return;
+    el.value = v; el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); dirty = true;
+  };
+  const ruFields = () => ({ summary: val("fields[summary][ru]"), desc: val("fields[desc][ru]"), payment_msg: val("fields[payment_msg][ru]") });
+  const putAll = (r, lang) => ["summary", "desc", "payment_msg"].forEach(k => { if (r[k] !== undefined && (r[k] || k !== "payment_msg")) put(`fields[${k}][${lang}]`, r[k]); });
+  const openEn = () => { const d = $("details.en", wrap); if (d) d.open = true; };
+  async function needKey(){
+    const s = await call("ai_status");
+    if (!s.has_key){ toast("Сначала добавьте ключ нейросети в настройках", true); openSettings(); return true; }
+    return false;
+  }
+  const busy = (btn, text) => { btn.disabled = true; btn.dataset.t = btn.textContent; btn.innerHTML = `<span class="spin"></span> ${text}`; };
+  const free = btn => { btn.disabled = false; btn.textContent = btn.dataset.t; };
+  $$("[data-ai]", wrap).forEach(b => b.onclick = async () => {
+    const a = b.dataset.ai, panel = $("#aiPanel", wrap);
+    if (a === "fill"){ panel.classList.toggle("hidden"); if (!panel.classList.contains("hidden")) $("#aiBrief", wrap).focus(); return; }
+    if (a === "close"){ panel.classList.add("hidden"); return; }
+    if (await needKey()) return;
+    if (a === "tr"){
+      busy(b, "Перевожу…");
+      try{ putAll(await call("ai_translate", ruFields()), "en"); openEn(); toast("Перевод готов — проверьте перед сохранением"); }
+      catch(e){ toast(e.message, true); } finally{ free(b); }
+      return;
+    }
+    if (a === "gen"){
+      const attrs = {};
+      F.forEach((f, i) => { if (f.kind === "select" && !f.locale){ const el = $(`[data-i="${i}"]`, wrap); const o = el && el.selectedOptions[0]; if (o && o.value) attrs[f.label] = o.textContent.trim(); } });
+      const withEn = !!($("#aiEn", wrap) || {}).checked, withPay = $("#aiPay", wrap).checked;
+      busy(b, "Пишу…");
+      try{
+        const r = await call("ai_generate", $("#aiBrief", wrap).value, categoryName || form.title, attrs, ruFields(), withPay, withEn);
+        putAll(r, "ru");
+        if (withEn) { putAll({ summary: r.summary_en, desc: r.desc_en, payment_msg: r.payment_msg_en }, "en"); openEn(); }
+        panel.classList.add("hidden");
+        toast("Текст готов — проверьте его перед сохранением");
+      }catch(e){ toast(e.message, true); } finally{ free(b); }
+    }
+  });
 
   const ft = wrap.querySelector(".ft");
   ft.innerHTML = `${offer ? '<button class="danger" data-a="del">Удалить</button>' : ""}
@@ -823,6 +884,46 @@ function showUpdate(u){
   };
 }
 $("#verBtn").onclick = () => checkUpdate(true);
+
+/* ---------- настройки ---------- */
+async function openSettings(){
+  const L = $("#layer");
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `<div class="overlay top"></div><div class="modal"><div class="hd">Настройки</div>
+    <div class="bd"><div class="loading"><span class="spin"></span></div></div>
+    <div class="ft"><button data-a="no">Закрыть</button></div></div>`;
+  L.append(wrap);
+  const close = () => wrap.remove();
+  wrap.querySelector(".overlay").onclick = close;
+  wrap.querySelector("[data-a=no]").onclick = close;
+  let st; try{ st = await call("ai_status"); }catch(e){ st = { has_key: false }; }
+  const bd = wrap.querySelector(".bd");
+  bd.innerHTML = `
+    <h4 style="margin:0 0 6px">Нейросеть (Claude)</h4>
+    <p class="muted" style="margin:0 0 12px;font-size:13px">Нужна для кнопок «✨ Заполнить с ИИ» и «🌐 Перевести» в редакторе лота.
+      Используется ключ Anthropic API — оплата по факту использования на вашем аккаунте Anthropic (одно описание обычно стоит доли цента–пару центов).</p>
+    <div class="field"><label>Ключ Anthropic API</label>
+      <div class="row"><input type="password" id="aiKey" autocomplete="off" spellcheck="false" placeholder="${st.has_key ? esc(st.masked) + " (сохранён)" : "sk-ant-…"}">
+      <button class="ghost" id="aiShow" title="Показать">👁</button></div>
+      <div class="hint">Создать ключ: <a class="lnk" id="aiConsole">console.anthropic.com → API Keys</a>. Хранится только на этом компьютере.</div></div>
+    <div class="err" id="aiErr"></div>`;
+  wrap.querySelector(".ft").innerHTML = `${st.has_key ? '<button class="danger" id="aiDel">Удалить ключ</button>' : ""}<div class="spacer"></div>
+    <button data-a="no">Закрыть</button><button class="primary" id="aiSave">Проверить и сохранить</button>`;
+  wrap.querySelector("[data-a=no]").onclick = close;
+  $("#aiShow", wrap).onclick = () => { const k = $("#aiKey", wrap); k.type = k.type === "password" ? "text" : "password"; };
+  $("#aiConsole", wrap).onclick = () => call("open_url", "https://console.anthropic.com/settings/keys");
+  const del = $("#aiDel", wrap);
+  if (del) del.onclick = async () => { await call("ai_set_key", ""); toast("Ключ нейросети удалён"); close(); };
+  $("#aiSave", wrap).onclick = async e => {
+    const k = $("#aiKey", wrap).value.trim(), err = $("#aiErr", wrap);
+    if (!k){ err.textContent = "Вставьте ключ"; return; }
+    const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spin"></span> Проверяю…'; err.textContent = "";
+    try{ const r = await call("ai_set_key", k); toast(`Ключ сохранён · ${r.model}`); close(); }
+    catch(x){ err.textContent = x.message; b.disabled = false; b.textContent = "Проверить и сохранить"; }
+  };
+  $("#aiKey", wrap).focus();
+}
+$("#setBtn").onclick = openSettings;
 
 /* ---------- старт ---------- */
 async function boot(){

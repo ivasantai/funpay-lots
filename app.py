@@ -16,7 +16,7 @@ import updater
 from funpay_client import FunPayClient, FunPayError
 
 APP_NAME = "FunPay Lots"
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 # Для проверки автообновления: FPL_VERSION_OVERRIDE=1.0.0 заставит приложение считать себя старой версией.
 RUNTIME_VERSION = os.environ.get("FPL_VERSION_OVERRIDE") or VERSION
 
@@ -64,6 +64,8 @@ def api_call(fn):
         except (FunPayError, updater.UpdateError) as e:
             return {"ok": False, "error": str(e)}
         except Exception as e:  # noqa: BLE001
+            if type(e).__name__ == "AIError":  # ai.py грузится лениво, поэтому без прямого импорта класса
+                return {"ok": False, "error": str(e)}
             traceback.print_exc()
             return {"ok": False, "error": f"Внутренняя ошибка: {e}"}
     wrapper.__name__ = fn.__name__
@@ -189,6 +191,38 @@ class Api:
                          twofactor: str = ""):
         return self._client().withdraw(currency, method, wallet, amount, bank, confirm=True, twofactor=twofactor)
 
+    # ---------- нейросеть ----------
+    def _ai(self):
+        import ai  # SDK Anthropic грузится только когда нужен — быстрее старт
+        return ai.AI(self._store.data.get("anthropic_key", ""), os.environ.get("FPL_ANTHROPIC_BASE_URL"))
+
+    @api_call
+    def ai_status(self):
+        key = self._store.data.get("anthropic_key", "")
+        return {"has_key": bool(key), "masked": (key[:10] + "…" + key[-4:]) if len(key) > 16 else ""}
+
+    @api_call
+    def ai_set_key(self, key: str):
+        key = (key or "").strip()
+        if not key:
+            self._store.data.pop("anthropic_key", None)
+            self._store.save()
+            return {"has_key": False}
+        import ai
+        model = ai.AI(key, os.environ.get("FPL_ANTHROPIC_BASE_URL")).check_key()
+        self._store.data["anthropic_key"] = key
+        self._store.save()
+        return {"has_key": True, "model": model}
+
+    @api_call
+    def ai_generate(self, brief: str, category: str, attributes: dict, current: dict,
+                    with_payment_msg: bool = False, with_english: bool = True):
+        return self._ai().generate(brief, category, attributes, current, bool(with_payment_msg), bool(with_english))
+
+    @api_call
+    def ai_translate(self, fields: dict):
+        return self._ai().translate(fields)
+
     # ---------- обновления ----------
     @api_call
     def check_update(self):
@@ -221,7 +255,8 @@ class Api:
 
     @api_call
     def open_url(self, url: str):
-        if url.startswith(("https://funpay.com/", "https://github.com/ivasantai/funpay-lots")):
+        if url.startswith(("https://funpay.com/", "https://github.com/ivasantai/funpay-lots",
+                           "https://console.anthropic.com/", "https://platform.claude.com/")):
             webbrowser.open(url)
         return True
 

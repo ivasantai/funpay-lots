@@ -2,13 +2,13 @@
 # Windows -> dist/FunPayLots.exe ; macOS -> dist/FunPay Lots.app
 import sys
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 a = Analysis(
     ["app.py"],
     pathex=[],
     datas=[("ui/index.html", "ui"), ("ui/icon.png", "ui")],
-    hiddenimports=[],
+    hiddenimports=["ai"],  # импортируется лениво внутри функций
     excludes=["tkinter"],
     noarchive=False,
 )
