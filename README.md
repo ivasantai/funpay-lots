@@ -2,7 +2,7 @@
 
 <h1 align="center">FunPay Lots</h1>
 
-<p align="center">Десктоп-приложение для управления лотами на FunPay — Windows 11 x64 и macOS (Apple Silicon).</p>
+<p align="center">Десктоп-приложение для управления лотами на FunPay — Windows, macOS (Apple Silicon и Intel) и Linux.</p>
 
 ## Возможности
 - Все свои лоты по разделам, включая неактивные; поиск и фильтр по статусу.
@@ -16,7 +16,12 @@
 
 ## Скачать
 [Releases](https://github.com/ivasantai/funpay-lots/releases):
-`FunPayLots.exe` для Windows, `FunPayLots-macos-arm64.zip` для Mac на M1–M4.
+| Система | Файл |
+|---|---|
+| Windows 10/11 x64 | `FunPayLots.exe` |
+| macOS 11+ на Apple Silicon (M1–M4) | `FunPayLots-macos-arm64.zip` |
+| macOS 11+ на Intel | `FunPayLots-macos-x86_64.zip` |
+| Linux x86_64 | `FunPayLots-linux-x86_64.tar.gz` |
 
 ## Документация
 - [Руководство пользователя](docs/USER_GUIDE.md): установка, где взять ключ, работа с лотами, частые проблемы.
