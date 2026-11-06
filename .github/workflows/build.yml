@@ -73,7 +73,10 @@ jobs:
           path: dist/FunPayLots-macos-${{ matrix.arch }}.zip
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: smoke-macos-${{ matrix.arch }}, path: smoke-macos-*.png, if-no-files-found: ignore }
+        with:
+          name: smoke-macos-${{ matrix.arch }}
+          path: smoke-macos-*.png
+          if-no-files-found: ignore
 
   linux:
     runs-on: ubuntu-22.04   # старый glibc — бинарник запустится на большинстве дистрибутивов
