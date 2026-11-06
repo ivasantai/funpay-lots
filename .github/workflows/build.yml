@@ -98,16 +98,14 @@ jobs:
       - name: Smoke run (screenshot)
         continue-on-error: true
         run: |
-          export DISPLAY=:99
-          Xvfb :99 -screen 0 1400x900x24 &
-          sleep 2
-          ./dist/FunPayLots > smoke.log 2>&1 &
-          APP=$!
-          sleep 25
-          import -window root smoke-linux.png
-          kill -0 $APP && echo "alive after 25s"
-          kill $APP || true
-          tail -n 30 smoke.log
+          xvfb-run -a -s "-screen 0 1400x900x24" bash -c '
+            ./dist/FunPayLots > smoke.log 2>&1 &
+            APP=$!
+            sleep 25
+            import -window root smoke-linux.png
+            kill -0 $APP && echo "alive after 25s"
+            kill $APP || true'
+          tail -n 30 smoke.log; cat ~/.config/funpay-lots/app.log 2>/dev/null || true
       - name: Pack
         run: |
           mkdir -p pkg/FunPayLots && cp dist/FunPayLots ui/icon.png pkg/FunPayLots/
