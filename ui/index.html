@@ -128,6 +128,43 @@ details.en[open] summary{margin-bottom:10px}
 .spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;display:inline-block;vertical-align:middle}
 @keyframes sp{to{transform:rotate(360deg)}}
 .loading{padding:40px;text-align:center;color:var(--muted)}
+
+/* вкладки */
+.tabs{display:inline-flex;gap:2px;background:var(--panel2);border-radius:9px;padding:3px;margin-left:12px}
+.tabs button{border:0;background:transparent;padding:6px 14px;border-radius:7px;color:var(--muted)}
+.tabs button.on{background:var(--panel);color:var(--text);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.ver{font-size:12px;color:var(--muted);padding:6px 8px}
+
+/* финансы */
+#viewFin{overflow:auto;padding:16px;min-height:0}
+.fin-wrap{max-width:1100px;margin:0 auto}
+.balances{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:22px}
+.bal{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.bal .nm{color:var(--muted);font-size:13px}
+.bal .v{font-size:26px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.fin-h{display:flex;align-items:center;gap:10px;margin:0 0 10px}
+.fin-h h3{margin:0;font-size:16px}
+.amt{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;font-weight:600}
+.amt.plus{color:var(--ok)} .amt.minus{color:var(--danger)}
+.badge{font-size:12px;padding:2px 8px;border-radius:10px;background:var(--panel2);color:var(--muted);white-space:nowrap}
+.badge.complete{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+.badge.cancel{background:color-mix(in srgb,var(--danger) 13%,transparent);color:var(--danger)}
+.badge.waiting,.badge.pending{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn)}
+a.lnk{color:var(--accent);cursor:pointer;text-decoration:none}
+a.lnk:hover{text-decoration:underline}
+.more{display:flex;justify-content:center;padding:12px}
+.sum{width:100%;border:0;margin:6px 0 12px}
+.sum td,.sum th{border-bottom:1px solid var(--line);padding:8px 4px;background:transparent}
+.sum th{background:transparent;position:static;width:40%;color:var(--muted);font-weight:500;font-size:13px}
+.warnbox{padding:10px 12px;border-radius:9px;background:color-mix(in srgb,var(--warn) 14%,transparent);font-size:13px;margin-bottom:12px}
+.inrow{display:flex;gap:8px}
+
+/* обновление */
+#upd{position:fixed;right:16px;bottom:16px;z-index:40;width:min(360px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:14px 16px}
+#upd h4{margin:0 0 4px;font-size:15px}
+#upd .notes{max-height:140px;overflow:auto;font-size:12.5px;color:var(--muted);white-space:pre-wrap;margin:6px 0 10px}
+.bar{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;margin:8px 0}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
 </style>
 </head>
 <body>
@@ -165,13 +202,18 @@ details.en[open] summary{margin-bottom:10px}
 <div id="main" class="hidden">
   <header>
     <div class="logo"><img src="icon.png" alt="">FunPay Lots</div>
+    <div class="tabs" id="tabs"><button data-v="lots" class="on">Лоты</button><button data-v="fin">Финансы</button></div>
     <div class="acc" id="acc"></div>
     <div class="spacer"></div>
-    <button id="refreshBtn">⟳ Обновить</button>
-    <button id="newBtn" class="primary">＋ Новый лот</button>
+    <span class="lots-only row">
+      <button id="refreshBtn">⟳ Обновить</button>
+      <button id="newBtn" class="primary">＋ Новый лот</button>
+    </span>
+    <button id="verBtn" class="ghost ver" title="Проверить обновления"></button>
     <button id="logoutBtn" class="ghost" title="Выйти и забыть ключ">Выйти</button>
   </header>
-  <div class="body">
+  <div id="viewFin" class="hidden"><div class="fin-wrap" id="fin"></div></div>
+  <div class="body" id="viewLots">
     <aside id="cats"></aside>
     <section class="list">
       <div class="toolbar">
@@ -197,6 +239,7 @@ details.en[open] summary{margin-bottom:10px}
 </div>
 
 <div id="layer"></div>
+<div id="upd" class="hidden"></div>
 <div id="toasts"></div>
 
 <script>
@@ -264,7 +307,7 @@ $("#key").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn
 $("#keyShow").onclick = () => { const k = $("#key"); k.type = k.type === "password" ? "text" : "password"; };
 $("#logoutBtn").onclick = async () => {
   if (!await confirmBox("Выйти?", "Сохранённый ключ будет удалён с этого компьютера.", "Выйти")) return;
-  await call("logout"); S.cats = []; showLogin();
+  await call("logout"); S.cats = []; S.fin = null; setView("lots"); showLogin();
 };
 
 /* ---------- список ---------- */
@@ -556,10 +599,238 @@ document.addEventListener("keydown", e => {
   }
 });
 
+/* ---------- вкладки ---------- */
+S.view = "lots";
+function setView(v){
+  S.view = v;
+  $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  $("#viewLots").classList.toggle("hidden", v !== "lots");
+  $("#viewFin").classList.toggle("hidden", v !== "fin");
+  $(".lots-only").classList.toggle("hidden", v !== "lots");
+  if (v === "fin" && !S.fin) loadFinance();
+}
+$$("#tabs button").forEach(b => b.onclick = () => setView(b.dataset.v));
+
+/* ---------- финансы ---------- */
+const num = s => parseFloat(String(s || "").replace(/[^\d.,-]/g, "").replace(",", ".")) || 0;
+S.tx = { filter: "", items: [], next: "", loading: false };
+
+async function loadFinance(){
+  $("#fin").innerHTML = '<div class="loading"><span class="spin"></span> Загружаю финансы…</div>';
+  try{
+    S.fin = await call("finance");
+    S.tx.items = []; S.tx.next = "";
+    renderFinance();
+    await loadTx(true);
+  }catch(e){
+    S.fin = null;
+    $("#fin").innerHTML = `<div class="empty">Не удалось загрузить: ${esc(e.message)}<br><br><button id="finRetry">Повторить</button></div>`;
+    $("#finRetry").onclick = loadFinance;
+  }
+}
+
+function renderFinance(){
+  const F = S.fin;
+  $("#fin").innerHTML = `
+    <div class="fin-h"><h3>Баланс</h3><div class="spacer"></div>
+      <button class="ghost" id="finOpenSite">Открыть на сайте ↗</button><button id="finRefresh">⟳ Обновить</button></div>
+    <div class="balances">${F.balances.map(b => `
+      <div class="bal"><div class="nm">${esc(b.name)}</div><div class="v">${esc(b.value || "0 " + b.unit)}</div>
+      <div><button class="primary" data-wd="${esc(b.id)}" ${num(b.value) > 0 && b.channels.length ? "" : "disabled"}>Вывести</button></div></div>`).join("")}
+    </div>
+    <div class="fin-h"><h3>История операций</h3><div class="spacer"></div>
+      <div class="seg" id="txFlt">${F.filters.map(f => `<button data-f="${esc(f.id)}" class="${f.id === S.tx.filter ? "on" : ""}">${esc(f.name)}</button>`).join("")}</div>
+    </div>
+    <div id="txWrap"></div>`;
+  $("#finRefresh").onclick = loadFinance;
+  $("#finOpenSite").onclick = () => call("open_url", "https://funpay.com/account/balance");
+  $$("[data-wd]").forEach(b => b.onclick = () => openWithdraw(b.dataset.wd));
+  $$("#txFlt button").forEach(b => b.onclick = () => {
+    S.tx.filter = b.dataset.f;
+    $$("#txFlt button").forEach(x => x.classList.toggle("on", x === b));
+    loadTx(true);
+  });
+}
+
+async function loadTx(reset){
+  if (S.tx.loading) return;
+  S.tx.loading = true;
+  if (reset){ S.tx.items = []; S.tx.next = ""; $("#txWrap").innerHTML = '<div class="loading"><span class="spin"></span></div>'; }
+  else { const m = $("#txMore"); if (m){ m.disabled = true; m.innerHTML = '<span class="spin"></span>'; } }
+  try{
+    const r = await call("transactions", S.tx.filter, S.tx.next);
+    S.tx.items = S.tx.items.concat(r.items);
+    S.tx.next = r.items.length ? r.next : "";
+  }catch(e){ toast(e.message, true); }
+  finally{ S.tx.loading = false; }
+  renderTx();
+}
+
+function renderTx(){
+  const it = S.tx.items;
+  if (!it.length){ $("#txWrap").innerHTML = '<div class="empty">Операций нет</div>'; return; }
+  $("#txWrap").innerHTML = `<table><thead><tr><th>Дата</th><th>Операция</th><th>Статус</th><th class="num">Сумма</th></tr></thead><tbody>${
+    it.map(t => `<tr>
+      <td style="white-space:nowrap">${esc(t.date)}<div class="sub muted" style="font-size:12px">${esc(t.ago)}</div></td>
+      <td class="title" style="width:60%">${t.order ? `<a class="lnk" data-order="${esc(t.order)}">${esc(t.title)}</a>` : esc(t.title)}</td>
+      <td><span class="badge ${esc(t.state)}">${esc(t.status)}</span></td>
+      <td class="amt ${t.sign === "+" ? "plus" : t.sign === "-" ? "minus" : ""}">${esc(t.amount)}</td></tr>`).join("")
+  }</tbody></table>${S.tx.next ? '<div class="more"><button id="txMore">Показать ещё</button></div>' : ""}`;
+  $$("[data-order]").forEach(a => a.onclick = () => call("open_url", `https://funpay.com/orders/${a.dataset.order}/`));
+  const m = $("#txMore"); if (m) m.onclick = () => loadTx(false);
+}
+
+function openWithdraw(currency){
+  const F = S.fin;
+  const L = $("#layer");
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `<div class="overlay top"></div><div class="modal"><div class="hd">Вывод средств</div><div class="bd"></div><div class="ft"></div></div>`;
+  L.append(wrap);
+  const bd = wrap.querySelector(".bd"), ft = wrap.querySelector(".ft");
+  const close = () => wrap.remove();
+  wrap.querySelector(".overlay").onclick = close;
+  const st = { currency, method: "", wallet: "", bank: "", amount: "" };
+
+  function step1(){
+    const bal = F.balances.find(b => b.id === st.currency) || F.balances[0];
+    if (!st.method || !bal.channels.some(c => c.id === st.method)) st.method = (bal.channels[0] || {}).id || "";
+    const ch = bal.channels.find(c => c.id === st.method);
+    const ext = F.ext[st.method] || { wallet_name: "Кошелёк", wallets: [], unit: "" };
+    if (!st.wallet && ext.wallets.length) st.wallet = ext.wallets[0];
+    bd.innerHTML = `
+      <div class="field"><label>Счёт</label><select id="wCur">${F.balances.map(b =>
+        `<option value="${esc(b.id)}" ${b.id === bal.id ? "selected" : ""}>${esc(b.name)} — ${esc(b.value)}</option>`).join("")}</select></div>
+      <div class="field"><label>Способ вывода</label><select id="wMet">${bal.channels.map(c =>
+        `<option value="${esc(c.id)}" ${c.id === st.method ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
+        <div class="hint" style="white-space:pre-line">${esc(ch ? ch.fee : "")}</div></div>
+      ${st.method === "fps" ? `<div class="field"><label>Банк</label><select id="wBank"><option value="">— выберите банк —</option>${
+        F.banks.map(b => `<option value="${esc(b.id)}" ${b.id === st.bank ? "selected" : ""}>${esc(b.name)}</option>`).join("")}</select></div>` : ""}
+      <div class="field"><label>${esc(ext.wallet_name)}</label>
+        <input type="text" id="wWal" list="wWalList" autocomplete="off" value="${esc(st.wallet)}">
+        <datalist id="wWalList">${ext.wallets.map(w => `<option value="${esc(w)}">`).join("")}</datalist>
+        ${ext.wallets.length ? '<div class="hint">Сохранённые реквизиты — в выпадающем списке поля.</div>' : ""}</div>
+      <div class="grid2">
+        <div class="field"><label>Сумма, ${esc(bal.unit)}</label><div class="inrow">
+          <input type="text" id="wAmt" inputmode="decimal" value="${esc(st.amount)}" placeholder="0.00">
+          <button class="ghost" id="wAll" title="Весь баланс">Всё</button></div></div>
+        <div class="field"><label>К получению, ${esc(ext.unit)}</label><input type="text" id="wGet" disabled placeholder="—"></div>
+      </div>
+      <div class="err" id="wErr"></div>`;
+    ft.innerHTML = `<button data-a="no">Отмена</button><button class="primary" id="wNext">Далее</button>`;
+    ft.querySelector("[data-a=no]").onclick = close;
+    const sync = () => {
+      st.wallet = $("#wWal", wrap).value; st.amount = $("#wAmt", wrap).value;
+      const bk = $("#wBank", wrap); if (bk) st.bank = bk.value;
+    };
+    $("#wCur", wrap).onchange = e => { sync(); st.currency = e.target.value; st.wallet = ""; step1(); };
+    $("#wMet", wrap).onchange = e => { sync(); st.method = e.target.value; st.wallet = ""; step1(); };
+    let timer, seq = 0;
+    const calc = () => {
+      sync(); clearTimeout(timer);
+      const out = $("#wGet", wrap);
+      if (!num(st.amount)){ out.value = ""; return; }
+      out.value = "…";
+      const my = ++seq;
+      timer = setTimeout(async () => {
+        try{
+          const r = await call("withdraw_calc", st.currency, st.method, st.amount, st.wallet, st.bank);
+          if (my === seq) out.value = r.amount_ext ? r.amount_ext : "—";
+        }catch(e){ if (my === seq) out.value = "—"; }
+      }, 350);
+    };
+    ["wAmt", "wWal"].forEach(id => $("#" + id, wrap).addEventListener("input", calc));
+    const bk = $("#wBank", wrap); if (bk) bk.onchange = calc;
+    $("#wAll", wrap).onclick = () => { $("#wAmt", wrap).value = String(num(bal.value)); calc(); };
+    if (st.amount) calc();
+    $("#wNext", wrap).onclick = async e => {
+      sync();
+      const err = $("#wErr", wrap); err.textContent = "";
+      if (!st.wallet.trim()) { err.textContent = `Укажите: ${ext.wallet_name}`; return; }
+      if (st.method === "fps" && !st.bank) { err.textContent = "Выберите банк"; return; }
+      if (!(num(st.amount) > 0)) { err.textContent = "Укажите сумму"; return; }
+      const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spin"></span> Проверяю…';
+      try{ step2(await call("withdraw_preview", st.currency, st.method, st.wallet, st.amount, st.bank), bal, ext); }
+      catch(x){ err.textContent = x.message; b.disabled = false; b.textContent = "Далее"; }
+    };
+  }
+
+  function step2(p, bal, ext){
+    const ch = bal.channels.find(c => c.id === st.method) || { name: st.method };
+    bd.innerHTML = `
+      <div class="warnbox">Проверьте реквизиты: после подтверждения FunPay создаст заявку на вывод, деньги спишутся с баланса.</div>
+      <table class="sum">
+        <tr><th>Способ</th><td>${esc(ch.name)}</td></tr>
+        ${p.bank ? `<tr><th>Банк</th><td>${esc(p.bank)}</td></tr>` : ""}
+        <tr><th>${esc(ext.wallet_name)}</th><td>${esc(p.wallet)}</td></tr>
+        <tr><th>Спишется</th><td><b>${esc(p.amount_int)} ${esc(bal.unit)}</b></td></tr>
+        <tr><th>К получению</th><td><b>${esc(p.amount_ext)} ${esc(ext.unit)}</b></td></tr>
+      </table>
+      ${p.twofactor ? '<div class="field"><label>Код 2FA из приложения-аутентификатора</label><input type="text" id="w2fa" inputmode="numeric" autocomplete="one-time-code" placeholder="000 000"></div>' : ""}
+      <div class="err" id="wErr"></div>`;
+    ft.innerHTML = `<button id="wBack">Назад</button><button class="danger fill" id="wGo">Вывести ${esc(p.amount_int)} ${esc(bal.unit)}</button>`;
+    $("#wBack", wrap).onclick = step1;
+    const f2 = $("#w2fa", wrap); if (f2) f2.focus();
+    $("#wGo", wrap).onclick = async e => {
+      const code = f2 ? f2.value.trim() : "";
+      const err = $("#wErr", wrap); err.textContent = "";
+      if (f2 && !code) { err.textContent = "Введите код 2FA"; return; }
+      const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spin"></span> Отправляю…';
+      try{
+        await call("withdraw_confirm", st.currency, st.method, st.wallet, st.amount, st.bank, code);
+        close(); toast("Заявка на вывод создана"); loadFinance();
+      }catch(x){ err.textContent = x.message; b.disabled = false; b.textContent = `Вывести ${p.amount_int} ${bal.unit}`; }
+    };
+  }
+  step1();
+}
+
+/* ---------- обновления ---------- */
+async function checkUpdate(manual=false){
+  try{
+    const u = await call("check_update");
+    if (!u.available){ if (manual) toast(`У вас последняя версия (${u.current})`); return; }
+    if (!manual && S.skipped === u.latest) return;
+    showUpdate(u);
+  }catch(e){ if (manual) toast(e.message, true); }
+}
+function showUpdate(u){
+  const box = $("#upd");
+  const mb = u.size ? ` · ${(u.size / 1048576).toFixed(1)} МБ` : "";
+  box.innerHTML = `<h4>Доступна версия ${esc(u.latest)}</h4>
+    <div class="muted" style="font-size:12.5px">Сейчас установлена ${esc(u.current)}${mb}</div>
+    ${u.notes ? `<div class="notes">${esc(u.notes)}</div>` : '<div style="height:10px"></div>'}
+    <div class="bar hidden"><i></i></div>
+    <div class="row"><button class="ghost" data-a="skip">Пропустить</button><div class="spacer"></div>
+      <button data-a="later">Позже</button>
+      <button class="primary" data-a="go">${u.can_install ? "Обновить" : "Скачать"}</button></div>`;
+  box.classList.remove("hidden");
+  box.querySelector("[data-a=later]").onclick = () => box.classList.add("hidden");
+  box.querySelector("[data-a=skip]").onclick = async () => { await call("skip_update", u.latest); S.skipped = u.latest; box.classList.add("hidden"); };
+  box.querySelector("[data-a=go]").onclick = async e => {
+    if (!u.can_install){ call("open_url", u.url); return; }
+    const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spin"></span> Скачиваю…';
+    $$("#upd button").forEach(x => x.disabled = true);
+    const bar = box.querySelector(".bar"); bar.classList.remove("hidden");
+    const t = setInterval(async () => { try{ bar.firstElementChild.style.width = Math.round(await call("update_progress") * 100) + "%"; }catch(_){} }, 300);
+    try{
+      await call("install_update");
+      bar.firstElementChild.style.width = "100%";
+      b.textContent = "Перезапуск…";
+    }catch(x){
+      toast(x.message, true);
+      $$("#upd button").forEach(y => y.disabled = false); b.textContent = "Обновить"; bar.classList.add("hidden");
+    }finally{ clearInterval(t); }
+  };
+}
+$("#verBtn").onclick = () => checkUpdate(true);
+
 /* ---------- старт ---------- */
 async function boot(){
   try{
     const st = await call("state");
+    S.skipped = st.skipped;
+    $("#verBtn").textContent = "v" + st.version;
+    setTimeout(() => checkUpdate(false), 1500);
     if (st.has_key){ $("#login").classList.add("hidden"); await doLogin(null, true); }
     else showLogin();
   }catch(e){ showLogin(e.message); }

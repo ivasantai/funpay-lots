@@ -255,6 +255,121 @@ class FunPayClient:
                 f["value"] = changes[f["name"]]
         return self.save(form["fields"])
 
+    # ---------- финансы ----------
+    def _xhr(self, path: str, data: dict) -> requests.Response:
+        headers = {"accept": "*/*", "x-requested-with": "XMLHttpRequest", "origin": BASE,
+                   "referer": f"{BASE}/account/balance"}
+        try:
+            r = self.s.post(f"{BASE}/{path}", data=data, headers=headers, timeout=TIMEOUT)
+        except requests.RequestException as e:
+            raise FunPayError(f"Нет связи с FunPay: {e}") from e
+        if r.status_code >= 400:
+            raise FunPayError(f"FunPay вернул ошибку {r.status_code} на {path}")
+        return r
+
+    def finance(self) -> dict:
+        """Балансы, способы вывода (с комиссиями и сохранёнными кошельками) и фильтры истории."""
+        self._need_login()
+        bs = BeautifulSoup(self._get("account/balance").text, "html.parser")
+        form = bs.find("form", action=re.compile(r"withdraw/withdraw"))
+        box = bs.select_one(".withdraw-box")
+        if not form or not box:
+            raise FunPayError("Не удалось прочитать страницу «Финансы» — возможно, FunPay изменил сайт.")
+        self._wd_csrf = form.select_one("[name=csrf_token]")["value"]
+        cfg = json.loads(box["data-data"])
+
+        balances = []
+        for o in form.select('select[name="currency_id"] option'):
+            content = BeautifulSoup(o.get("data-content", ""), "html.parser")
+            cur = cfg["currencies"].get(o["value"], {})
+            balances.append({
+                "id": o["value"],
+                "name": _text(content.select_one(".payment-title")) or cur.get("name", o["value"]),
+                "value": _text(content.select_one(".payment-value")),
+                "unit": cur.get("unit", ""),
+                "channels": [{"id": ch["extCurrency"], "name": ch["name"], "fee": ch.get("feeInfo", "")}
+                             for ch in cur.get("channels", [])],
+            })
+        ext = {k: {"name": v.get("name", k), "unit": v.get("unit", ""), "wallet_name": v.get("walletName", "Кошелёк"),
+                   "wallets": v.get("wallets") or []} for k, v in cfg["extCurrencies"].items()}
+        banks = []
+        for o in form.select('select[name="wallet_extra"] option'):
+            if o.get("value"):
+                banks.append({"id": o["value"], "name": _text(BeautifulSoup(o.get("data-content", ""), "html.parser")) or o["value"]})
+        filters = [{"id": a.get("data-value", ""), "name": _text(a)} for a in bs.select(".dyn-table-filter [data-value]")]
+        if not filters:
+            filters = [{"id": "", "name": "Все операции"}]
+        return {"balances": balances, "ext": ext, "banks": banks, "filters": filters}
+
+    def transactions(self, filter_: str = "", cont: str = "") -> dict:
+        """Одна страница истории операций. cont — значение «continue» из прошлой страницы."""
+        self._need_login()
+        r = self._xhr("users/transactions", {"user_id": self.account.id, "continue": cont or "", "filter": filter_ or ""})
+        bs = BeautifulSoup(r.text, "html.parser")
+        items = []
+        for it in bs.select(".tc-item"):
+            cls = " ".join(it.get("class", []))
+            m = re.search(r"transaction-status-(\w+)", cls)
+            price = _text(it.select_one(".tc-price"))
+            title = _text(it.select_one(".tc-title"))
+            order = re.search(r"Заказ #(\w+)", title)
+            items.append({
+                "id": it.get("data-transaction"),
+                "date": _text(it.select_one(".tc-date-time")),
+                "ago": _text(it.select_one(".tc-date-left")),
+                "title": title,
+                "status": _text(it.select_one(".tc-status")),
+                "state": m.group(1) if m else "",
+                "amount": price,
+                "sign": "+" if price.startswith("+") else ("-" if price[:1] in "-−" else ""),
+                "order": order.group(1) if order else "",
+            })
+        nxt = bs.select_one("[name=continue]")
+        return {"items": items, "next": nxt.get("value", "") if nxt else ""}
+
+    def _withdraw_data(self, currency: str, method: str, wallet: str, amount: str, bank: str = "") -> dict:
+        if not getattr(self, "_wd_csrf", None):
+            self.finance()
+        data = {"csrf_token": self._wd_csrf, "currency_id": currency, "ext_currency_id": method,
+                "wallet": (wallet or "").strip(), "amount_int": str(amount or "").replace(",", ".").strip()}
+        if method == "fps":
+            data["wallet_extra"] = bank or ""
+        return data
+
+    def withdraw_calc(self, currency: str, method: str, amount: str, wallet: str = "", bank: str = "") -> dict:
+        """Сколько придёт после комиссии (ничего не выводит)."""
+        data = self._withdraw_data(currency, method, wallet, amount, bank)
+        data["preview"] = "1"
+        try:
+            return self._xhr("withdraw/calc", data).json()
+        except ValueError:
+            raise FunPayError("FunPay не смог посчитать сумму к получению.")
+
+    def withdraw(self, currency: str, method: str, wallet: str, amount: str, bank: str = "",
+                 confirm: bool = False, twofactor: str = "") -> dict:
+        """Вывод в два шага, как на сайте.
+        confirm=False — предпросмотр: FunPay проверяет данные и возвращает итог, деньги НЕ списываются.
+        confirm=True — настоящая заявка на вывод (с кодом 2FA, если он включён)."""
+        data = self._withdraw_data(currency, method, wallet, amount, bank)
+        data["preview"] = "" if confirm else "1"
+        if confirm and twofactor:
+            data["twofactor_code"] = re.sub(r"\s", "", twofactor)
+        r = self._xhr("withdraw/withdraw", data)
+        try:
+            js = r.json()
+        except ValueError:
+            raise FunPayError(f"Неожиданный ответ FunPay: {r.text[:200]}")
+        if js.get("twofactor_error"):
+            raise FunPayError(js.get("twofactor_msg") or "Неверный код 2FA")
+        if js.get("error"):
+            raise FunPayError(js.get("msg") or "FunPay отклонил вывод")
+        if confirm:
+            self._wd_csrf = None  # после вывода страница выдаёт новый токен
+            return {"done": True, "url": js.get("url", "")}
+        return {"wallet": js.get("wallet", data["wallet"]), "amount_int": js.get("amount_int"),
+                "amount_ext": js.get("amount_ext"), "bank": js.get("fps_bank_name") or "",
+                "twofactor": bool(js.get("twofactor_enabled"))}
+
     def delete(self, node: int, offer: int) -> dict:
         return self._modify(node, offer, {"deleted": "1"})
 

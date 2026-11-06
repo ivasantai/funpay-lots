@@ -36,6 +36,37 @@
     delete: () => ok({ done: true }),
     set_active: () => ok({ done: true }),
     forget_category: () => ok(true),
+    finance: () => ok({
+      balances: [
+        { id: "usd", name: "Доллары", value: "21.50 $", unit: "$", channels: [
+          { id: "card_usd", name: "Банковская карта", fee: "Россия: комиссия 3%, но не менее 2.75 $" },
+          { id: "fps", name: "СБП", fee: "Комиссия 3%, но не менее 1 $; курс 84.327" },
+          { id: "usdt_trc", name: "USDT TRC20", fee: "Комиссия 6%, но не менее 1.5 $" }] },
+        { id: "rub", name: "Рубли", value: "2.40 ₽", unit: "₽", channels: [{ id: "card_rub", name: "Банковская карта", fee: "Комиссия 3%, но не менее 30 ₽" }] },
+        { id: "eur", name: "Евро", value: "0 €", unit: "€", channels: [{ id: "card_eur", name: "Банковская карта", fee: "" }] },
+      ],
+      ext: {
+        card_usd: { name: "Банковская карта", unit: "$", wallet_name: "Номер карты", wallets: ["2200 **** **** 1234"] },
+        card_rub: { name: "Банковская карта", unit: "₽", wallet_name: "Номер карты", wallets: [] },
+        card_eur: { name: "Банковская карта", unit: "€", wallet_name: "Номер карты", wallets: [] },
+        fps: { name: "СБП", unit: "₽", wallet_name: "Телефон для СБП", wallets: [] },
+        usdt_trc: { name: "USDT TRC20", unit: "USDT", wallet_name: "Кошелек", wallets: ["TXyz…demo"] },
+      },
+      banks: [{ id: "1", name: "Сбербанк" }, { id: "2", name: "Т-Банк" }],
+      filters: [{ id: "", name: "Все операции" }, { id: "payment", name: "Пополнения" }, { id: "withdraw", name: "Выводы" }, { id: "order", name: "Заказы" }, { id: "other", name: "Другое" }],
+    }),
+    transactions: (f, c) => ok({ next: c ? "" : "p2", items: [
+      { id: "1", date: "сегодня, 11:52", ago: "3 часа назад", title: "Заказ #KZQ4C3E7", status: "Завершено", state: "complete", amount: "+ 3.50 $", sign: "+", order: "KZQ4C3E7" },
+      { id: "2", date: "вчера, 22:11", ago: "16 часов назад", title: "Вывод денег #29612674", status: "Завершено", state: "complete", amount: "− 35.00 $", sign: "-", order: "" },
+      { id: "3", date: "2 ноября, 10:03", ago: "4 дня назад", title: "Отмена вывода денег #29612283", status: "Отменено", state: "cancel", amount: "+ 35.00 $", sign: "+", order: "" },
+    ]}),
+    withdraw_calc: (cur, m, a) => ok({ amount_int: 0, amount_ext: Math.max(0, +(parseFloat(a) * 0.97).toFixed(2)) }),
+    withdraw_preview: (cur, m, w, a) => ok({ wallet: w, amount_int: a, amount_ext: (parseFloat(a) * 0.97).toFixed(2), bank: "", twofactor: true }),
+    withdraw_confirm: () => ok({ done: true }),
+    check_update: () => ok({ current: "1.2.0", latest: "1.3.0", available: true, notes: "- Пример заметок к релизу", url: "", download: "", size: 14000000, can_install: true }),
+    skip_update: () => ok(true),
+    update_progress: () => ok(0.5),
+    install_update: () => new Promise(r => setTimeout(() => r({ ok: true, data: true }), 1500)),
     open_url: () => ok(true),
   };
 })();
