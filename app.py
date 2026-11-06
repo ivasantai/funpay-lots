@@ -12,10 +12,13 @@ from pathlib import Path
 
 import webview
 
+import updater
 from funpay_client import FunPayClient, FunPayError
 
 APP_NAME = "FunPay Lots"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
+# Для проверки автообновления: FPL_VERSION_OVERRIDE=1.0.0 заставит приложение считать себя старой версией.
+RUNTIME_VERSION = os.environ.get("FPL_VERSION_OVERRIDE") or VERSION
 
 
 def resource(rel: str) -> Path:
@@ -58,7 +61,7 @@ def api_call(fn):
     def wrapper(self, *a, **kw):
         try:
             return {"ok": True, "data": fn(self, *a, **kw)}
-        except FunPayError as e:
+        except (FunPayError, updater.UpdateError) as e:
             return {"ok": False, "error": str(e)}
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
@@ -69,44 +72,48 @@ def api_call(fn):
 
 class Api:
     def __init__(self):
-        self.store = Store()
-        self.client: FunPayClient | None = None
+        self._store = Store()
+        self._fp: FunPayClient | None = None
+        self._window = None
+        self._update: dict | None = None
+        self._progress = 0.0
 
     def _client(self) -> FunPayClient:
-        if not self.client:
+        if not self._fp:
             raise FunPayError("Сначала войдите по ключу.")
-        return self.client
+        return self._fp
 
     @api_call
     def state(self):
-        return {"has_key": bool(self.store.data.get("golden_key")), "version": VERSION}
+        return {"has_key": bool(self._store.data.get("golden_key")), "version": RUNTIME_VERSION,
+                "skipped": self._store.data.get("skip_version", "")}
 
     @api_call
     def login(self, key: str | None = None, remember: bool = True):
-        key = key or self.store.data.get("golden_key")
+        key = key or self._store.data.get("golden_key")
         if not key:
             raise FunPayError("Введите golden_key.")
         client = FunPayClient(key)
         acc = client.login()
-        self.client = client
+        self._fp = client
         if remember:
-            self.store.data["golden_key"] = key.strip()
+            self._store.data["golden_key"] = key.strip()
         else:
-            self.store.data.pop("golden_key", None)
-        self.store.save()
+            self._store.data.pop("golden_key", None)
+        self._store.save()
         return {"id": acc.id, "username": acc.username, "balance": acc.balance}
 
     @api_call
     def logout(self):
-        self.client = None
-        self.store.data.pop("golden_key", None)
-        self.store.save()
+        self._fp = None
+        self._store.data.pop("golden_key", None)
+        self._store.save()
         return True
 
     @api_call
     def lots(self):
         c = self._client()
-        nodes: dict[int, str] = {int(k): v for k, v in self.store.data["nodes"].items()}
+        nodes: dict[int, str] = {int(k): v for k, v in self._store.data["nodes"].items()}
         for n, name in c.profile_categories().items():
             nodes[n] = name or nodes.get(n, "")
 
@@ -123,9 +130,9 @@ class Api:
         for n, page_name, lots, err in results:
             name = nodes.get(n) or page_name or f"Раздел {n}"
             if not err:
-                self.store.data["nodes"][str(n)] = name
+                self._store.data["nodes"][str(n)] = name
             cats.append({"node": n, "name": name, "lots": lots, "error": err})
-        self.store.save()
+        self._store.save()
         cats.sort(key=lambda x: x["name"].lower())
         return cats
 
@@ -141,9 +148,9 @@ class Api:
     def save(self, node: int, fields: list, category_name: str = ""):
         res = self._client().save(fields)
         key = str(int(node))
-        if category_name or key not in self.store.data["nodes"]:
-            self.store.data["nodes"][key] = category_name or self.store.data["nodes"].get(key) or f"Раздел {node}"
-            self.store.save()
+        if category_name or key not in self._store.data["nodes"]:
+            self._store.data["nodes"][key] = category_name or self._store.data["nodes"].get(key) or f"Раздел {node}"
+            self._store.save()
         return res
 
     @api_call
@@ -156,20 +163,86 @@ class Api:
 
     @api_call
     def forget_category(self, node: int):
-        self.store.data["nodes"].pop(str(int(node)), None)
-        self.store.save()
+        self._store.data["nodes"].pop(str(int(node)), None)
+        self._store.save()
+        return True
+
+    # ---------- финансы ----------
+    @api_call
+    def finance(self):
+        return self._client().finance()
+
+    @api_call
+    def transactions(self, filter_: str = "", cont: str = ""):
+        return self._client().transactions(filter_, cont)
+
+    @api_call
+    def withdraw_calc(self, currency: str, method: str, amount: str, wallet: str = "", bank: str = ""):
+        return self._client().withdraw_calc(currency, method, amount, wallet, bank)
+
+    @api_call
+    def withdraw_preview(self, currency: str, method: str, wallet: str, amount: str, bank: str = ""):
+        return self._client().withdraw(currency, method, wallet, amount, bank, confirm=False)
+
+    @api_call
+    def withdraw_confirm(self, currency: str, method: str, wallet: str, amount: str, bank: str = "",
+                         twofactor: str = ""):
+        return self._client().withdraw(currency, method, wallet, amount, bank, confirm=True, twofactor=twofactor)
+
+    # ---------- обновления ----------
+    @api_call
+    def check_update(self):
+        self._update = updater.check(RUNTIME_VERSION)
+        return self._update
+
+    @api_call
+    def skip_update(self, version: str):
+        self._store.data["skip_version"] = version
+        self._store.save()
+        return True
+
+    @api_call
+    def update_progress(self):
+        return self._progress
+
+    @api_call
+    def install_update(self):
+        if not self._update or not self._update.get("available"):
+            raise updater.UpdateError("Нет доступного обновления.")
+        self._progress = 0.0
+
+        def prog(p):
+            self._progress = p
+        updater.install(self._update, prog)
+        self._progress = 1.0
+        # Новая версия уже запущена (или запустится после выхода) — закрываем текущую.
+        threading.Timer(0.5, lambda: self._window and self._window.destroy()).start()
         return True
 
     @api_call
     def open_url(self, url: str):
-        if url.startswith("https://funpay.com/"):
+        if url.startswith(("https://funpay.com/", "https://github.com/ivasantai/funpay-lots")):
             webbrowser.open(url)
         return True
 
 
 def main():
+    updater.cleanup_old()
+    if "--update" in sys.argv:  # обновление без интерфейса; результат — в update.log рядом с config.json
+        log = config_dir() / "update.log"
+        try:
+            info = updater.check(RUNTIME_VERSION)
+            msg = f"current {info['current']}, latest {info['latest']}, available {info['available']}"
+            if info["available"]:
+                updater.install(info)
+                msg += " -> installed, new version started"
+        except Exception as e:  # noqa: BLE001
+            msg = f"error: {e}"
+        log.write_text(msg + "\n", encoding="utf-8")
+        print(msg)
+        return
     api = Api()
-    webview.create_window(
+    api._window = webview.create_window(
         APP_NAME, url=str(resource("ui/index.html")), js_api=api,
         width=1240, height=800, min_size=(900, 600), background_color="#0f1115",
     )

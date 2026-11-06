@@ -2,7 +2,7 @@
 # Windows -> dist/FunPayLots.exe ; macOS -> dist/FunPay Lots.app
 import sys
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 a = Analysis(
     ["app.py"],

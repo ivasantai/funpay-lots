@@ -10,7 +10,8 @@
 
 ```
 app.py               окно, мост JS ↔ Python (класс Api), хранение настроек
-funpay_client.py     клиент FunPay: вход, список лотов, форма лота, сохранение, удаление
+funpay_client.py     клиент FunPay: вход, лоты, финансы и вывод
+updater.py           проверка и установка обновлений из GitHub Releases
 ui/index.html        интерфейс (вход, список, редактор, выбор раздела)
 ui/mock.js           фейковое API для просмотра интерфейса в браузере (?mock)
 ui/icon.png          логотип в интерфейсе
@@ -46,7 +47,15 @@ pywebview вызывает методы `Api` в отдельных потока
 | `save(node, fields, category_name)` | отправить форму; запоминает раздел |
 | `delete(node, offer)` / `set_active(node, offer, active)` | удаление / вкл-выкл |
 | `forget_category(node)` | убрать раздел из запомненных |
-| `open_url(url)` | открыть страницу FunPay в браузере (только `https://funpay.com/…`) |
+| `finance()` | балансы, способы вывода, сохранённые реквизиты, банки СБП, фильтры истории |
+| `transactions(filter, cont)` | страница истории операций; `cont` — курсор следующей страницы |
+| `withdraw_calc(...)` | сумма к получению с учётом комиссии |
+| `withdraw_preview(...)` / `withdraw_confirm(..., twofactor)` | два шага вывода (см. ниже) |
+| `check_update()` / `install_update()` / `update_progress()` / `skip_update(v)` | автообновление |
+| `open_url(url)` | открыть в браузере (только `https://funpay.com/…` и страницы этого репозитория) |
+
+Публичные атрибуты объекта `Api` pywebview тоже пробрасывает в JS, поэтому внутреннее состояние
+хранится в полях с подчёркиванием (`_fp`, `_store`, `_window`).
 
 ## Как работает клиент FunPay
 
@@ -67,6 +76,34 @@ pywebview вызывает методы `Api` в отдельных потока
 Ответ `offerSave` — JSON: `{"done": true, "error": false, "errors": [], "url": …}` или
 `{"error": "…", "errors": [["price", "Укажите цену."], …]}`. Клиент подставляет вместо имён полей
 их подписи из формы: «Цена за 1 шт.: Укажите цену».
+
+### Финансы и вывод
+
+| Действие | Запрос |
+|---|---|
+| Балансы и настройки вывода | `GET /account/balance` → форма `withdraw/withdraw`: `select[name=currency_id]` (балансы в `data-content`), JSON в `.withdraw-box[data-data]`: `currencies[cur].channels` (способы и `feeInfo`) и `extCurrencies[ext]` (`walletName`, сохранённые `wallets`), банки СБП — `select[name=wallet_extra]` |
+| История | `POST /users/transactions` с `user_id`, `filter` (`""`, `payment`, `withdraw`, `order`, `other`), `continue` (курсор). Ответ — HTML с `.tc-item` и новым `continue` |
+| Сумма к получению | `POST /withdraw/calc` (`currency_id`, `ext_currency_id`, `wallet`, `amount_int`) → `{"amount_ext": …}` |
+| Вывод, шаг 1 | `POST /withdraw/withdraw` с `preview=1` → проверка и итог (`wallet`, `amount_int`, `amount_ext`, `twofactor_enabled`), **без списания** |
+| Вывод, шаг 2 | тот же запрос с `preview=""` и `twofactor_code` → заявка на вывод. Ошибки: `error`+`msg` или `twofactor_error`+`twofactor_msg` |
+
+Двухшаговая схема повторяет логику сайта (`app.bundle.js`, обработчик формы `.withdraw-box`).
+Для СБП (`ext_currency_id=fps`) дополнительно отправляется `wallet_extra` — ID банка.
+
+### Автообновление (`updater.py`)
+1. `GET https://api.github.com/repos/ivasantai/funpay-lots/releases/latest` (без токена — репозиторий публичный).
+2. Версия из `tag_name` сравнивается с `VERSION`; описание релиза показывается как список изменений.
+3. Установка — только в собранной версии (`sys.frozen`):
+   - **Windows:** `FunPayLots.new.exe` скачивается рядом; запущенный exe переименовывается в `.old`
+     (Windows разрешает переименование, но не удаление), новый встаёт на его место и запускается
+     с `PYINSTALLER_RESET_ENVIRONMENT=1`; `.old` удаляется при следующем старте.
+   - **macOS:** zip распаковывается через `ditto` (сохраняет права и симлинки), снимается карантин,
+     старый `.app` переименовывается в `.app.old`, новый копируется на его место; фоновый `sh` ждёт выхода
+     процесса, удаляет старую копию и делает `open`.
+4. Текущее окно закрывается.
+
+`FunPayLots.exe --update` — то же без интерфейса (результат в `update.log` рядом с `config.json`).
+`FPL_VERSION_OVERRIDE=1.0.0` заставляет приложение считать себя старой версией — для проверки обновления.
 
 ### Динамическая форма
 `get_form` превращает HTML-форму в список полей:
@@ -107,6 +144,8 @@ pywebview вызывает методы `Api` в отдельных потока
 так же как его хранит браузер.
 
 ## Безопасность
-- Ключ уходит только на `funpay.com`; других сетевых запросов приложение не делает.
-- `open_url` открывает только адреса `https://funpay.com/…`.
+- Ключ уходит только на `funpay.com`. Кроме FunPay приложение обращается только к GitHub
+  (`api.github.com` и скачивание релиза) — без ключа и личных данных.
+- Вывод средств всегда идёт в два шага: предпросмотр от FunPay → явное подтверждение пользователем.
+- `open_url` открывает только `https://funpay.com/…` и страницы этого репозитория.
 - Все данные с FunPay выводятся в интерфейс через экранирование (`esc()`), HTML из лотов не исполняется.
