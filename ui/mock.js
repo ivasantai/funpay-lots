@@ -65,7 +65,8 @@
     withdraw_confirm: () => ok({ done: true }),
     check_update: () => ok({ current: "1.2.0", latest: "1.3.0", available: true, notes: "- Пример заметок к релизу", url: "", download: "", size: 14000000, can_install: true }),
     skip_update: () => ok(true),
-    ai_status: () => ok({ has_key: true, masked: "sk-ant-api…demo" }),
+    ai_status: () => ok({ has_key: false, masked: "", translator: "auto", free_email: "" }),
+    set_translator: () => ok(true),
     ai_set_key: () => ok({ has_key: true, model: "Claude Opus 5.5" }),
     ai_generate: (brief, cat, attrs, cur, pay, en) => ok({
       summary: "⚡ ChatGPT Plus — аренда личного аккаунта на 3 часа", desc: "✅ Что вы получаете:\n— личный аккаунт ChatGPT Plus\n— выдача сразу после оплаты\n\n💎 +1 час за отзыв",
@@ -73,7 +74,7 @@
       summary_en: en ? "⚡ ChatGPT Plus — personal account rental for 3 hours" : undefined,
       desc_en: en ? "✅ What you get:\n— personal ChatGPT Plus account\n— instant delivery after payment\n\n💎 +1 hour for a review" : undefined,
       payment_msg_en: en && pay ? "Thanks for your purchase! Login details are in this chat." : undefined }),
-    ai_translate: f => ok({ summary: f.summary ? "EN: " + f.summary : "", desc: f.desc ? "EN: " + f.desc : "", payment_msg: f.payment_msg ? "EN: " + f.payment_msg : "" }),
+    ai_translate: f => ok({ engine: "free", summary: f.summary ? "EN: " + f.summary : "", desc: f.desc ? "EN: " + f.desc : "", payment_msg: f.payment_msg ? "EN: " + f.payment_msg : "" }),
     update_progress: () => ok(0.5),
     install_update: () => new Promise(r => setTimeout(() => r({ ok: true, data: true }), 1500)),
     open_url: () => ok(true),

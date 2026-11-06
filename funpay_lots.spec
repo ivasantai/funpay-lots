@@ -5,13 +5,13 @@
 import platform
 import sys
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 a = Analysis(
     ["app.py"],
     pathex=[],
     datas=[("ui/index.html", "ui"), ("ui/icon.png", "ui")],
-    hiddenimports=["ai"],  # импортируется лениво внутри функций
+    hiddenimports=["ai", "free_translate"],  # импортируются лениво внутри функций
     excludes=["tkinter"],
     noarchive=False,
 )
