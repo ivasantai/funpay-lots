@@ -16,7 +16,7 @@ import updater
 from funpay_client import FunPayClient, FunPayError
 
 APP_NAME = "FunPay Lots"
-VERSION = "1.3.1"
+VERSION = "1.4.0"
 # Для проверки автообновления: FPL_VERSION_OVERRIDE=1.0.0 заставит приложение считать себя старой версией.
 RUNTIME_VERSION = os.environ.get("FPL_VERSION_OVERRIDE") or VERSION
 
@@ -261,7 +261,48 @@ class Api:
         return True
 
 
+def gui_backend() -> str | None:
+    """На Linux собранная версия использует Qt (QtWebEngine): его можно положить внутрь приложения,
+    в отличие от GTK/WebKit. На Windows/macOS pywebview сам выбирает Edge WebView2 / WebKit."""
+    if sys.platform.startswith("linux"):
+        return os.environ.get("PYWEBVIEW_GUI") or "qt"
+    return None
+
+
+def selftest() -> int:
+    """Проверка сборки без окна: все модули и ресурсы на месте. Код возврата 0 — всё хорошо."""
+    lines = [f"FunPay Lots {VERSION} {sys.platform} {updater.arch()} frozen={updater.is_frozen()}"]
+    try:
+        import anthropic
+        import bs4
+        import ai  # noqa: F401
+        lines.append(f"anthropic {anthropic.__version__}, bs4 {bs4.__version__}")
+        assert resource("ui/index.html").is_file() and resource("ui/icon.png").is_file(), "нет файлов интерфейса"
+        if sys.platform == "win32":
+            import webview.platforms.winforms  # noqa: F401  (тянет pythonnet и WebView2)
+        elif sys.platform == "darwin":
+            import webview.platforms.cocoa  # noqa: F401  (тянет pyobjc и WebKit)
+        else:
+            import webview.platforms.qt  # noqa: F401  (тянет PyQt6 и QtWebEngine)
+        lines.append(f"update asset: {updater.asset_name()}")
+        lines.append("OK")
+        code = 0
+    except Exception as e:  # noqa: BLE001
+        lines.append(f"FAIL: {type(e).__name__}: {e}")
+        code = 1
+    text = "\n".join(lines)
+    print(text)
+    (config_dir() / "selftest.log").write_text(text + "\n", encoding="utf-8")
+    return code
+
+
 def main():
+    if "--selftest" in sys.argv:
+        sys.exit(selftest())
+    if sys.platform.startswith("linux") and updater.is_frozen():
+        # Песочница Chromium внутри QtWebEngine часто недоступна в упакованном приложении
+        # (AppArmor/user namespaces). Окно показывает только локальный интерфейс приложения.
+        os.environ.setdefault("QTWEBENGINE_DISABLE_SANDBOX", "1")
     updater.cleanup_old()
     if "--update" in sys.argv:  # обновление без интерфейса; результат — в update.log рядом с config.json
         log = config_dir() / "update.log"
@@ -281,7 +322,7 @@ def main():
         APP_NAME, url=str(resource("ui/index.html")), js_api=api,
         width=1240, height=800, min_size=(900, 600), background_color="#0f1115",
     )
-    webview.start(debug=bool(os.environ.get("FPL_DEBUG")))
+    webview.start(debug=bool(os.environ.get("FPL_DEBUG")), gui=gui_backend(), icon=str(resource("ui/icon.png")))
 
 
 if __name__ == "__main__":
