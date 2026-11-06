@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FunPay Lots</title>
+<link rel="icon" href="icon.png">
 <style>
 :root{
   --bg:#f4f5f7; --panel:#ffffff; --panel2:#f0f2f5; --line:#e2e5ea; --text:#1b1f27; --muted:#6b7280;
@@ -53,7 +54,8 @@ details.help ol{padding-left:18px;margin:8px 0 0}
 #main{height:100%;display:grid;grid-template-rows:auto 1fr}
 header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
 .logo{font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px}
-.logo i{width:22px;height:22px;border-radius:6px;background:var(--accent);display:inline-block}
+.logo img{width:24px;height:24px;display:block}
+.card .brand{width:64px;height:64px;display:block;margin-bottom:14px}
 .acc{color:var(--muted);font-size:13px}
 .acc b{color:var(--text)}
 .body{display:grid;grid-template-columns:260px 1fr;min-height:0}
@@ -133,6 +135,7 @@ details.en[open] summary{margin-bottom:10px}
 <!-- ВХОД -->
 <div id="login" class="hidden">
   <div class="card">
+    <img class="brand" src="icon.png" alt="">
     <h1>FunPay Lots</h1>
     <p class="muted">Управление лотами вашего аккаунта FunPay</p>
     <div class="field">
@@ -161,7 +164,7 @@ details.en[open] summary{margin-bottom:10px}
 <!-- ОСНОВНОЙ ЭКРАН -->
 <div id="main" class="hidden">
   <header>
-    <div class="logo"><i></i>FunPay Lots</div>
+    <div class="logo"><img src="icon.png" alt="">FunPay Lots</div>
     <div class="acc" id="acc"></div>
     <div class="spacer"></div>
     <button id="refreshBtn">⟳ Обновить</button>
