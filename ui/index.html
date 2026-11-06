@@ -559,13 +559,19 @@ async function openEditor(node, offer=null, categoryName=""){
     const a = b.dataset.ai, panel = $("#aiPanel", wrap);
     if (a === "fill"){ panel.classList.toggle("hidden"); if (!panel.classList.contains("hidden")) $("#aiBrief", wrap).focus(); return; }
     if (a === "close"){ panel.classList.add("hidden"); return; }
-    if (await needKey()) return;
     if (a === "tr"){
+      // Перевод работает и без ключа: тогда используется бесплатный переводчик MyMemory.
       busy(b, "Перевожу…");
-      try{ putAll(await call("ai_translate", ruFields()), "en"); openEn(); toast("Перевод готов — проверьте перед сохранением"); }
+      try{
+        const r = await call("ai_translate", ruFields());
+        putAll(r, "en"); openEn();
+        toast(r.engine === "free" ? "Перевод готов (бесплатный переводчик) — проверьте перед сохранением"
+                                  : "Перевод готов — проверьте перед сохранением");
+      }
       catch(e){ toast(e.message, true); } finally{ free(b); }
       return;
     }
+    if (await needKey()) return;
     if (a === "gen"){
       const attrs = {};
       F.forEach((f, i) => { if (f.kind === "select" && !f.locale){ const el = $(`[data-i="${i}"]`, wrap); const o = el && el.selectedOptions[0]; if (o && o.value) attrs[f.label] = o.textContent.trim(); } });
@@ -898,17 +904,31 @@ async function openSettings(){
   wrap.querySelector("[data-a=no]").onclick = close;
   let st; try{ st = await call("ai_status"); }catch(e){ st = { has_key: false }; }
   const bd = wrap.querySelector(".bd");
+  const tr = st.translator || "auto";
+  const radio = (v, title, hint) => `<label class="chk" style="align-items:flex-start"><input type="radio" name="trMode" value="${v}" ${tr === v ? "checked" : ""} style="margin-top:3px">
+      <span>${title}<br><span class="muted" style="font-size:12.5px">${hint}</span></span></label>`;
   bd.innerHTML = `
     <h4 style="margin:0 0 6px">Нейросеть (Claude)</h4>
-    <p class="muted" style="margin:0 0 12px;font-size:13px">Нужна для кнопок «✨ Заполнить с ИИ» и «🌐 Перевести» в редакторе лота.
+    <p class="muted" style="margin:0 0 12px;font-size:13px">Нужна для «✨ Заполнить с ИИ» и для качественного перевода.
       Используется ключ Anthropic API — оплата по факту использования на вашем аккаунте Anthropic (одно описание обычно стоит доли цента–пару центов).</p>
     <div class="field"><label>Ключ Anthropic API</label>
       <div class="row"><input type="password" id="aiKey" autocomplete="off" spellcheck="false" placeholder="${st.has_key ? esc(st.masked) + " (сохранён)" : "sk-ant-…"}">
       <button class="ghost" id="aiShow" title="Показать">👁</button></div>
       <div class="hint">Создать ключ: <a class="lnk" id="aiConsole">console.anthropic.com → API Keys</a>. Хранится только на этом компьютере.</div></div>
-    <div class="err" id="aiErr"></div>`;
-  wrap.querySelector(".ft").innerHTML = `${st.has_key ? '<button class="danger" id="aiDel">Удалить ключ</button>' : ""}<div class="spacer"></div>
-    <button data-a="no">Закрыть</button><button class="primary" id="aiSave">Проверить и сохранить</button>`;
+    <div class="row">${st.has_key ? '<button class="danger" id="aiDel">Удалить ключ</button>' : ""}<div class="spacer"></div>
+      <button class="primary" id="aiSave">Проверить и сохранить ключ</button></div>
+    <div class="err" id="aiErr"></div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+    <h4 style="margin:0 0 8px">Перевод на английский</h4>
+    ${radio("auto", "Автоматически", "Нейросеть, если добавлен ключ; без ключа — бесплатный переводчик.")}
+    ${radio("free", "Всегда бесплатный переводчик (MyMemory)", "Без ключа и оплаты, но проще по качеству. Лимит около 5 000 символов в день.")}
+    ${radio("claude", "Всегда нейросеть", "Лучшее качество, нужен ключ Anthropic.")}
+    <div class="field" style="margin-top:10px"><label>Почта для бесплатного переводчика <span class="muted" style="font-weight:400">(необязательно)</span></label>
+      <input type="text" id="trEmail" autocomplete="off" spellcheck="false" placeholder="you@example.com" value="${esc(st.free_email || "")}">
+      <div class="hint">С почтой MyMemory поднимает дневной лимит примерно до 50 000 символов. Почта отправляется только в MyMemory вместе с запросами перевода.</div></div>
+    <div class="row"><div class="spacer"></div><button id="trSave">Сохранить настройки перевода</button></div>
+    <div class="err" id="trErr"></div>`;
+  wrap.querySelector(".ft").innerHTML = `<div class="spacer"></div><button data-a="no">Закрыть</button>`;
   wrap.querySelector("[data-a=no]").onclick = close;
   $("#aiShow", wrap).onclick = () => { const k = $("#aiKey", wrap); k.type = k.type === "password" ? "text" : "password"; };
   $("#aiConsole", wrap).onclick = () => call("open_url", "https://console.anthropic.com/settings/keys");
@@ -919,9 +939,14 @@ async function openSettings(){
     if (!k){ err.textContent = "Вставьте ключ"; return; }
     const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spin"></span> Проверяю…'; err.textContent = "";
     try{ const r = await call("ai_set_key", k); toast(`Ключ сохранён · ${r.model}`); close(); }
-    catch(x){ err.textContent = x.message; b.disabled = false; b.textContent = "Проверить и сохранить"; }
+    catch(x){ err.textContent = x.message; b.disabled = false; b.textContent = "Проверить и сохранить ключ"; }
   };
-  $("#aiKey", wrap).focus();
+  $("#trSave", wrap).onclick = async () => {
+    const mode = ($('input[name="trMode"]:checked', wrap) || {}).value || "auto", err = $("#trErr", wrap);
+    err.textContent = "";
+    try{ await call("set_translator", mode, $("#trEmail", wrap).value); toast("Настройки перевода сохранены"); }
+    catch(x){ err.textContent = x.message; }
+  };
 }
 $("#setBtn").onclick = openSettings;
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import threading
 import traceback
@@ -16,7 +17,7 @@ import updater
 from funpay_client import FunPayClient, FunPayError
 
 APP_NAME = "FunPay Lots"
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 # Для проверки автообновления: FPL_VERSION_OVERRIDE=1.0.0 заставит приложение считать себя старой версией.
 RUNTIME_VERSION = os.environ.get("FPL_VERSION_OVERRIDE") or VERSION
 
@@ -74,7 +75,7 @@ def api_call(fn):
         except (FunPayError, updater.UpdateError) as e:
             return {"ok": False, "error": str(e)}
         except Exception as e:  # noqa: BLE001
-            if type(e).__name__ == "AIError":  # ai.py грузится лениво, поэтому без прямого импорта класса
+            if type(e).__name__ in ("AIError", "FreeTranslateError"):  # модули грузятся лениво
                 return {"ok": False, "error": str(e)}
             traceback.print_exc()
             return {"ok": False, "error": f"Внутренняя ошибка: {e}"}
@@ -209,7 +210,24 @@ class Api:
     @api_call
     def ai_status(self):
         key = self._store.data.get("anthropic_key", "")
-        return {"has_key": bool(key), "masked": (key[:10] + "…" + key[-4:]) if len(key) > 16 else ""}
+        return {"has_key": bool(key), "masked": (key[:10] + "…" + key[-4:]) if len(key) > 16 else "",
+                "translator": self._store.data.get("translator", "auto"),
+                "free_email": self._store.data.get("mymemory_email", "")}
+
+    @api_call
+    def set_translator(self, mode: str, email: str = ""):
+        if mode not in ("auto", "free", "claude"):
+            raise FunPayError("Неизвестный режим перевода.")
+        email = (email or "").strip()
+        if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            raise FunPayError("Почта для переводчика указана неверно.")
+        self._store.data["translator"] = mode
+        if email:
+            self._store.data["mymemory_email"] = email
+        else:
+            self._store.data.pop("mymemory_email", None)
+        self._store.save()
+        return True
 
     @api_call
     def ai_set_key(self, key: str):
@@ -231,7 +249,14 @@ class Api:
 
     @api_call
     def ai_translate(self, fields: dict):
-        return self._ai().translate(fields)
+        """Перевод на английский. Режим «auto»: нейросеть, если есть ключ, иначе бесплатный MyMemory."""
+        mode = self._store.data.get("translator", "auto")
+        has_key = bool(self._store.data.get("anthropic_key"))
+        if mode == "claude" or (mode == "auto" and has_key):
+            return {"engine": "claude", **self._ai().translate(fields)}
+        import free_translate
+        tr = free_translate.FreeTranslator(self._store.data.get("mymemory_email", ""))
+        return {"engine": "free", **tr.translate(fields)}
 
     # ---------- обновления ----------
     @api_call
@@ -286,6 +311,7 @@ def selftest() -> int:
         import anthropic
         import bs4
         import ai  # noqa: F401
+        import free_translate  # noqa: F401
         lines.append(f"anthropic {anthropic.__version__}, bs4 {bs4.__version__}")
         assert resource("ui/index.html").is_file() and resource("ui/icon.png").is_file(), "нет файлов интерфейса"
         if sys.platform == "win32":
