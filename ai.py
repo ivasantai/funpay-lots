@@ -36,6 +36,12 @@ TRANSLATE_SYSTEM = """You translate FunPay marketplace listings from Russian to 
 - summary stays a single line. Empty input field -> empty output field."""
 
 
+REPLY_SYSTEM = """Ты помогаешь продавцу на маркетплейсе FunPay отвечать покупателям и на отзывы.
+Правила FunPay: никаких контактов и ссылок вне FunPay, не просить покупателя писать в другие мессенджеры,
+не обещать того, чего продавец не говорил. Тон — дружелюбный и профессиональный, без канцелярита.
+Верни только текст сообщения в поле text, без кавычек и пояснений."""
+
+
 def _schema(keys) -> dict:
     return {
         "type": "object",
@@ -130,6 +136,31 @@ class AI:
             out["payment_msg"] = ""
             out.pop("payment_msg_en", None)
         return out
+
+    def reply_chat(self, messages: list[dict], hint: str = "") -> dict:
+        """Черновик ответа покупателю по истории чата (последние сообщения)."""
+        lines = []
+        for m in messages:
+            who = "Система FunPay" if m.get("system") else ("Продавец (я)" if m.get("mine") else f"Покупатель {m.get('name') or ''}".strip())
+            text = (m.get("text") or ("[картинка]" if m.get("image") else "")).strip()
+            if text:
+                lines.append(f"{who}: {text}")
+        if not lines:
+            raise AIError("В чате нет сообщений, на которые можно ответить.")
+        prompt = ("Переписка в чате FunPay (старые сверху):\n" + "\n".join(lines[-30:]) +
+                  "\n\nНапиши следующее сообщение продавца покупателю: по делу, вежливо, коротко, на языке покупателя."
+                  + (f"\nЧто хочет сказать продавец: {hint.strip()}" if hint and hint.strip() else
+                     "\nЕсли не хватает фактов (наличие, сроки), не выдумывай — уточни у покупателя или ответь общо."))
+        return self._ask(REPLY_SYSTEM, prompt, ("text",), effort="low")
+
+    def reply_review(self, review: str, rating: int | None, lot_title: str, hint: str = "") -> dict:
+        if not (review or "").strip():
+            raise AIError("У заказа нет отзыва.")
+        prompt = (f"Лот: {lot_title or '—'}\nОценка покупателя: {rating or '—'} из 5\nОтзыв: {review.strip()}\n\n"
+                  "Напиши публичный ответ продавца на этот отзыв: 1–3 предложения, вежливо, без оправданий и споров; "
+                  "на благодарность — поблагодари, на жалобу — спокойно и по делу."
+                  + (f"\nЧто хочет сказать продавец: {hint.strip()}" if hint and hint.strip() else ""))
+        return self._ask(REPLY_SYSTEM, prompt, ("text",), effort="low")
 
     def translate(self, fields: dict) -> dict:
         src = {k: (fields or {}).get(k, "") for k in FIELDS}

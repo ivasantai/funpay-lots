@@ -2,11 +2,11 @@
 (() => {
   const ok = data => new Promise(r => setTimeout(() => r({ ok: true, data }), 250));
   const cats = [
-    { node: 1355, name: "Аккаунты ChatGPT", error: null, lots: [
+    { node: 1355, name: "Аккаунты ChatGPT", error: null, game: 334, lots: [
       { id: 101, node: 1355, title: "ChatGPT Plus — аренда на 3 часа, личный аккаунт", server: "", amount: "1", price: "5", unit: "$", active: true },
       { id: 102, node: 1355, title: "ChatGPT Plus — аренда на 6 часов", server: "", amount: "1", price: "8", unit: "$", active: false },
     ]},
-    { node: 1392, name: "Прочее Telegram", error: null, lots: [
+    { node: 1392, name: "Прочее Telegram", error: null, game: 224, lots: [
       { id: 201, node: 1392, title: "Telegram Mini App под ключ", server: "", amount: "999 999", price: "12.87", unit: "$", active: true },
     ]},
   ];
@@ -24,8 +24,54 @@
     { name: "amount", label: "Наличие", kind: "text", locale: "", value: offer ? "1" : "" },
     { name: "active", label: "Активное", kind: "checkbox", locale: "", value: true },
   ]});
+  const now = Date.now() / 1000;
+  const settings = { theme: "auto", close_to_background: false, notify_orders: true, notify_chats: true, notify_raise: false,
+    rental_notify: true, rental_auto_msg: false, rental_bonus: 0, rental_msg: "Здравствуйте, {buyer}! Аренда по заказу #{order} закончилась." };
+  const orders = [
+    { id: "ORDER001", date: "сегодня, 11:52", ts: now - 3600, title: "ChatGPT Plus — аренда НА 3 ЧАСА, С подпиской, Plus", category: "ChatGPT, Аккаунты", buyer: "buyer1", buyer_id: 1, status: "closed", status_text: "Закрыт", amount: "5.00", unit: "$" },
+    { id: "ORDER002", date: "сегодня, 10:20", ts: now - 7000, title: "Claude PRO НА 1 ЧАС", category: "Claude, Аккаунты", buyer: "buyer2", buyer_id: 2, status: "paid", status_text: "Оплачен", amount: "3.50", unit: "$" },
+    { id: "ORDER003", date: "вчера, 16:27", ts: now - 86400, title: "Claude PRO НА 3 ЧАСА", category: "Claude, Аккаунты", buyer: "buyer3", buyer_id: 3, status: "refunded", status_text: "Возврат", amount: "5.00", unit: "$" },
+  ];
+  const byDay = Array.from({ length: 30 }, (_, i) => { const d = new Date(Date.now() - (29 - i) * 864e5).toISOString().slice(0, 10);
+    const v = [0, 3.5, 5, 0, 12, 7, 0, 21.5, 3.5, 0][i % 10]; return { date: d, revenue: v ? { "$": v } : {}, orders: v ? Math.ceil(v / 5) : 0, refunds: i % 9 === 0 ? 1 : 0 }; });
   window.MOCK_API = {
-    state: () => ok({ has_key: false, version: "mock" }),
+    state: () => ok({ has_key: false, version: "mock", settings, tray: true, platform: "win32" }),
+    events: () => ok([]),
+    set_setting: (k, v) => { settings[k] = v; return ok(v); },
+    accounts: () => ok([{ id: "1", username: "DemoSeller", active: true, saved: true, autoraise: true }, { id: "2", username: "SecondShop", active: false, saved: true, autoraise: false }]),
+    switch_account: () => ok({ id: 2, username: "SecondShop", balance: "3 $" }),
+    autoraise_state: () => ok({ enabled: true, nodes: [1355, 1392], background: false,
+      next: { "334": now + 5400, "224": now + 1200 }, last: { "334": { ts: now - 9000, ok: true, msg: "Предложения подняты", node: 1355 }, "224": { ts: now - 2400, ok: false, msg: "Подождите час.", node: 1392 } } }),
+    autoraise_set: () => ok(true),
+    raise_now: () => ok({ ok: false, msg: "Подождите 2 часа.", wait: 7200, game: 334 }),
+    templates: () => ok([{ id: "t1", name: "Аренда ChatGPT", fields: { "fields[summary][ru]": "ChatGPT Plus — аренда", "fields[desc][ru]": "Описание по шаблону" } }]),
+    template_save: (n, f) => ok([{ id: "t1", name: n, fields: f }]),
+    template_delete: () => ok([]),
+    bulk_edit: () => ok({ changed: true, price: "6" }),
+    backup_lot: (n, o, c) => ok({ node: n, offer: o, category: c, title: "Лот " + o, fields: { "fields[summary][ru]": "Лот " + o } }),
+    backup_save: () => ok("C:/demo.json"),
+    backup_open: () => ok({ path: "C:/demo.json", account: "DemoSeller", created: "2026-11-07 12:00", lots: [{ node: 1355, title: "Лот из бэкапа", category: "Аккаунты ChatGPT", fields: {} }] }),
+    backup_restore: () => ok({ done: true, skipped_fields: [] }),
+    orders: () => ok({ items: orders, next: "" }),
+    order: id => ok({ id, status: "Закрыт", buyer: "buyer3", chat_id: 77, can_refund: true,
+      params: [{ name: "Категория", value: "Аккаунты" }, { name: "Краткое описание", value: "Claude PRO НА 3 ЧАСА" }, { name: "Сумма", value: "5 $" }],
+      review: { rating: 4, text: "Всё отлично, быстро выдали", reply: "", can_reply: true } }),
+    refund: () => ok({ done: true }), review_reply: () => ok({ done: true }),
+    rentals: () => ok([{ ...orders[0], minutes: 180, end: now + 7200, left: 7200, active: true }, { ...orders[1], minutes: 60, end: now + 300, left: 300, active: true }]),
+    chats: () => ok([{ id: 77, name: "buyer1", last: "есть в наличии что то?", time: "10:12", unread: true, msg_id: 5 }, { id: 78, name: "buyer3", last: "Спасибо!", time: "вчера", unread: false, msg_id: 3 }]),
+    chat_history: id => ok({ id, messages: [
+      { id: 1, author: 0, mine: false, system: true, name: null, time: "09:00", text: "Покупатель оплатил заказ #ORDER001." },
+      { id: 2, author: 5, mine: false, system: false, name: "buyer1", time: "09:01", text: "Здравствуйте! Когда выдадите?" },
+      { id: 3, author: 1, mine: true, system: false, name: "DemoSeller", time: "09:02", text: "Добрый день, уже отправил данные 👍" }] }),
+    send_message: () => ok({ done: true }),
+    ai_chat_reply: () => ok({ text: "Здравствуйте! Да, в наличии есть — оформляйте заказ, выдам сразу." }),
+    ai_review_reply: () => ok({ text: "Спасибо за отзыв! Рады, что всё понравилось 🙌" }),
+    stats: days => ok({ days, unit: "$", avg: 17.93, buyers: 12, repeat_buyers: 3, totals: { revenue: { "$": 412.5 }, orders: 23, refunds: 3, refund_sum: { "$": 15 } },
+      by_day: byDay.slice(-days), top: [{ title: "CLAUDE x5 MAX 1 МЕСЯЦ", orders: 1, revenue: { "$": 155 }, category: "Claude, Аккаунты" }, { title: "Claude PRO НА 1 ЧАС", orders: 7, revenue: { "$": 21.5 }, category: "Claude, Аккаунты" }] }),
+    competitors: node => ok({ node, total_offers: 1126, rows: [
+      { id: 101, title: "ChatGPT Plus — аренда НА 3 ЧАСА", visible: true, minutes: 180, my_price: 5.6, unit: "$", rivals: 41, rank: 9, min: 1.2, median: 4.8,
+        cheapest: [{ id: 9, price: 1.2, unit: "$", seller: "cheapShop", online: true, title: "ChatGPT Plus 3 часа" }] },
+      { id: 102, title: "ChatGPT Plus — аренда НА 6 ЧАСОВ", visible: false, active: false, minutes: 360, my_price: null, seller_price: "8", unit: "$", rivals: 12, rank: null, min: 3, median: 7.5, cheapest: [] }] }),
     login: () => ok({ id: 1, username: "DemoSeller", balance: "50 $" }),
     logout: () => ok(true),
     lots: () => ok(cats),

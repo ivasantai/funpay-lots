@@ -3,4 +3,6 @@ pywebview[qt]>=6.0; sys_platform == "linux"
 requests>=2.31
 beautifulsoup4>=4.12
 anthropic>=2.6
+pystray>=0.19; sys_platform == "win32"
+pillow>=10; sys_platform == "win32"
 pyinstaller>=6.10
