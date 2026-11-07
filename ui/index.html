@@ -12,9 +12,12 @@
   --shadow:0 10px 30px rgba(15,20,30,.12); --r:10px;
 }
 @media (prefers-color-scheme: dark){
-  :root{ --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --text:#e7e9ee; --muted:#8b93a3;
+  :root:not([data-theme="light"]){ --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --text:#e7e9ee; --muted:#8b93a3;
     --accent:#4b83f5; --danger:#ef5a5a; --ok:#3cc47c; --warn:#e3a72f; --shadow:0 10px 30px rgba(0,0,0,.45);}
 }
+:root[data-theme="dark"]{ --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --text:#e7e9ee; --muted:#8b93a3;
+  --accent:#4b83f5; --danger:#ef5a5a; --ok:#3cc47c; --warn:#e3a72f; --shadow:0 10px 30px rgba(0,0,0,.45); color-scheme:dark;}
+:root[data-theme="light"]{ color-scheme:light; }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;overflow:hidden}
@@ -166,6 +169,69 @@ a.lnk:hover{text-decoration:underline}
 .flash{animation:fl 1.6s ease}
 @keyframes fl{0%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 55%,transparent)}100%{box-shadow:none}}
 
+/* общие для новых экранов */
+.view{overflow:auto;padding:16px;min-height:0}
+.chip{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:9px;background:var(--panel2);color:var(--muted);font-weight:500}
+.chip.on{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);margin-left:6px;vertical-align:middle}
+.menu{position:fixed;z-index:45;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:6px;min-width:230px;display:flex;flex-direction:column}
+.menu button{border:0;background:transparent;text-align:left;padding:8px 10px;border-radius:7px}
+.menu button:hover:not(:disabled){background:var(--panel2)}
+.menu button:disabled{opacity:1;color:var(--accent);font-weight:600;cursor:default}
+.menu hr{border:0;border-top:1px solid var(--line);margin:5px 0}
+button.acc{padding:6px 10px;color:var(--muted)}
+.sec-h{display:flex;align-items:center;gap:10px;margin:0 0 10px}
+.sec-h h3{margin:0;font-size:16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:20px}
+.rcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.rcard .big{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.rcard.over .big{color:var(--danger)}
+.rcard.soon .big{color:var(--warn)}
+.bar2{height:5px;background:var(--panel2);border-radius:4px;overflow:hidden}
+.bar2 i{display:block;height:100%;background:var(--accent)}
+tr.clickable td{cursor:pointer}
+.params{display:grid;grid-template-columns:160px 1fr;gap:6px 12px;font-size:13.5px;margin-bottom:14px}
+.params .k{color:var(--muted)}
+.params .v{white-space:pre-wrap;word-break:break-word}
+.review{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px}
+.stars{color:var(--warn);letter-spacing:1px}
+/* чаты */
+.chats-view{display:grid;grid-template-columns:300px 1fr;min-height:0}
+#chatList{border-right:1px solid var(--line);overflow:auto;background:var(--panel)}
+.citem{padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.citem:hover{background:var(--panel2)}
+.citem.sel{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.citem .n{font-weight:600;display:flex;gap:6px;align-items:center}
+.citem .t{font-size:11.5px;color:var(--muted);margin-left:auto;font-weight:400}
+.citem .l{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.citem.unread .n{color:var(--accent)}
+#chatPane{display:grid;grid-template-rows:auto 1fr auto;min-height:0}
+.chat-hd{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;background:var(--panel)}
+.msgs{overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:72%;padding:8px 11px;border-radius:12px;background:var(--panel);border:1px solid var(--line);white-space:pre-wrap;word-break:break-word;font-size:13.5px}
+.msg.mine{align-self:flex-end;background:color-mix(in srgb,var(--accent) 16%,var(--panel));border-color:transparent}
+.msg.sys{align-self:center;max-width:90%;background:var(--panel2);color:var(--muted);font-size:12.5px;border-style:dashed}
+.msg .meta{font-size:11px;color:var(--muted);margin-top:3px}
+.composer{padding:10px 16px;border-top:1px solid var(--line);display:flex;gap:8px;background:var(--panel)}
+.composer textarea{min-height:44px;max-height:160px}
+/* аналитика */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi .l{font-size:12.5px;color:var(--muted)}
+.kpi .v{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px}
+.kpi .s{font-size:12px;color:var(--muted)}
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px 6px;margin-bottom:16px;position:relative}
+.chart h4{margin:0 0 6px;font-size:14px}
+.chart svg{display:block;width:100%;height:220px}
+.chart .grid line{stroke:var(--line);stroke-width:1}
+.chart .ax{fill:var(--muted);font-size:11px}
+.chart .bar{fill:var(--accent)}
+.chart .hit{fill:transparent;cursor:default}
+.chart .hit:hover + .bar, .chart .bar.hl{opacity:.75}
+.tip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);font-size:12px;padding:6px 9px;border-radius:7px;white-space:nowrap;transform:translate(-50%,-110%);display:none}
+.rank-good{color:var(--ok);font-weight:600}
+.rank-bad{color:var(--danger);font-weight:600}
+
 /* обновление */
 #upd{position:fixed;right:16px;bottom:16px;z-index:40;width:min(360px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:14px 16px}
 #upd h4{margin:0 0 4px;font-size:15px}
@@ -191,6 +257,7 @@ a.lnk:hover{text-decoration:underline}
       <label class="chk hint"><input id="remember" type="checkbox" checked> Запомнить на этом компьютере</label>
     </div>
     <button id="loginBtn" class="primary" style="width:100%">Войти</button>
+    <button id="loginCancel" class="ghost hidden" style="width:100%;margin-top:8px">Отмена — вернуться к текущему аккаунту</button>
     <div id="loginErr" class="err"></div>
     <details class="help">
       <summary>Где взять ключ?</summary>
@@ -209,18 +276,24 @@ a.lnk:hover{text-decoration:underline}
 <div id="main" class="hidden">
   <header>
     <div class="logo"><img src="icon.png" alt="">FunPay Lots</div>
-    <div class="tabs" id="tabs"><button data-v="lots" class="on">Лоты</button><button data-v="fin">Финансы</button></div>
-    <div class="acc" id="acc"></div>
+    <div class="tabs" id="tabs">
+      <button data-v="lots" class="on" title="Ctrl+1">Лоты</button><button data-v="orders" title="Ctrl+2">Заказы</button><button data-v="chats" title="Ctrl+3">Чаты<span class="dot hidden" id="chatDot"></span></button><button data-v="fin" title="Ctrl+4">Финансы</button><button data-v="stats" title="Ctrl+5">Аналитика</button>
+    </div>
+    <button class="ghost acc" id="acc" title="Аккаунты"></button>
     <div class="spacer"></div>
     <span class="lots-only row">
-      <button id="refreshBtn">⟳ Обновить</button>
-      <button id="newBtn" class="primary">＋ Новый лот</button>
+      <button id="raiseBtn" title="Автоподнятие лотов">⚡ Поднятие <span class="chip" id="raiseChip"></span></button>
+      <button id="moreBtn" class="ghost" title="Бэкап и восстановление">⋯</button>
+      <button id="refreshBtn" title="Ctrl+R">⟳</button>
+      <button id="newBtn" class="primary" title="Ctrl+N">＋ Новый лот</button>
     </span>
     <button id="verBtn" class="ghost ver" title="Проверить обновления"></button>
     <button id="setBtn" class="ghost" title="Настройки">⚙</button>
-    <button id="logoutBtn" class="ghost" title="Выйти и забыть ключ">Выйти</button>
   </header>
-  <div id="viewFin" class="hidden"><div class="fin-wrap" id="fin"></div></div>
+  <div id="viewFin" class="hidden view"><div class="fin-wrap" id="fin"></div></div>
+  <div id="viewOrders" class="hidden view"><div class="fin-wrap" id="ordersBox"></div></div>
+  <div id="viewChats" class="hidden chats-view"><aside id="chatList"></aside><section id="chatPane"></section></div>
+  <div id="viewStats" class="hidden view"><div class="fin-wrap" id="statsBox"></div></div>
   <div class="body" id="viewLots">
     <aside id="cats"></aside>
     <section class="list">
@@ -238,6 +311,8 @@ a.lnk:hover{text-decoration:underline}
         <b id="bulkN"></b>
         <button data-bulk="on">Включить</button>
         <button data-bulk="off">Выключить</button>
+        <button data-bulk="price">Цена…</button>
+        <button data-bulk="text">Заменить текст…</button>
         <button data-bulk="del" class="danger">Удалить</button>
         <button data-bulk="clear" class="ghost">Снять выделение</button>
       </div>
@@ -302,21 +377,57 @@ async function doLogin(key, remember){
   $("#loginErr").textContent = "";
   try{
     const acc = await call("login", key, remember);
-    $("#acc").innerHTML = `<b>${esc(acc.username)}</b>${acc.balance ? " · " + esc(acc.balance) : ""}`;
+    $("#acc").innerHTML = `<b>${esc(acc.username)}</b>${acc.balance ? " · " + esc(acc.balance) : ""} ▾`;
     $("#login").classList.add("hidden");
     $("#main").classList.remove("hidden");
     $("#key").value = "";
+    S.adding = false; $("#loginCancel").classList.add("hidden");
+    resetAccountViews();
+    setView("lots");
     await loadLots();
+    refreshRaiseChip();
   }catch(e){ showLogin(e.message); }
   finally{ btn.disabled = false; btn.textContent = "Войти"; }
 }
 $("#loginBtn").onclick = () => doLogin($("#key").value, $("#remember").checked);
+$("#loginCancel").onclick = () => { S.adding = false; $("#loginCancel").classList.add("hidden"); $("#login").classList.add("hidden"); $("#main").classList.remove("hidden"); };
 $("#key").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
 $("#keyShow").onclick = () => { const k = $("#key"); k.type = k.type === "password" ? "text" : "password"; };
-$("#logoutBtn").onclick = async () => {
-  if (!await confirmBox("Выйти?", "Сохранённый ключ будет удалён с этого компьютера.", "Выйти")) return;
-  await call("logout"); S.cats = []; S.fin = null; setView("lots"); showLogin();
+function resetAccountViews(){
+  S.cats = []; S.fin = null; S.orders = null; S.chatsLoaded = false; S.chat = null; S.stats = null; S.picked.clear();
+}
+
+/* ---------- аккаунты ---------- */
+$("#acc").onclick = async e => {
+  e.stopPropagation();
+  const old = $("#accMenu"); if (old){ old.remove(); return; }
+  let list = [];
+  try{ list = await call("accounts"); }catch(_){}
+  const r = $("#acc").getBoundingClientRect();
+  const m = document.createElement("div");
+  m.id = "accMenu"; m.className = "menu"; m.style.left = r.left + "px"; m.style.top = (r.bottom + 6) + "px";
+  m.innerHTML = list.map(a => `<button data-uid="${esc(a.id)}" ${a.active ? "disabled" : ""}>${a.active ? "✓ " : ""}${esc(a.username)}${a.autoraise ? ' <span class="chip">⚡</span>' : ""}</button>`).join("")
+    + `<hr><button data-act="add">＋ Добавить аккаунт</button><button data-act="out" class="danger">Выйти из ${esc((list.find(a => a.active) || {}).username || "аккаунта")}</button>`;
+  document.body.append(m);
+  m.querySelectorAll("[data-uid]").forEach(b => b.onclick = async () => {
+    m.remove();
+    try{
+      const acc = await call("switch_account", b.dataset.uid);
+      $("#acc").innerHTML = `<b>${esc(acc.username)}</b>${acc.balance ? " · " + esc(acc.balance) : ""} ▾`;
+      resetAccountViews(); setView("lots"); await loadLots(); refreshRaiseChip();
+      toast(`Аккаунт: ${acc.username}`);
+    }catch(x){ toast(x.message, true); }
+  });
+  m.querySelector("[data-act=add]").onclick = () => { m.remove(); S.adding = true; showLogin(); $("#loginCancel").classList.remove("hidden"); };
+  m.querySelector("[data-act=out]").onclick = async () => {
+    m.remove();
+    if (!await confirmBox("Выйти из аккаунта?", "Ключ этого аккаунта будет удалён с компьютера.", "Выйти")) return;
+    const r = await call("logout"); resetAccountViews(); setView("lots");
+    if (r.others){ await doLogin(null, true); return; }
+    showLogin();
+  };
 };
+document.addEventListener("click", e => { const m = $("#accMenu"); if (m && !m.contains(e.target)) m.remove(); });
 
 /* ---------- список ---------- */
 async function loadLots(){
@@ -385,6 +496,7 @@ function renderTable(){
         <td class="actions">
           <button class="ghost" data-a="edit" title="Редактировать">✎</button>
           <button class="ghost" data-a="open" title="Открыть на сайте">↗</button>
+          <button class="ghost" data-a="dup" title="Дублировать">⧉</button>
           <button class="ghost danger" data-a="del" title="Удалить">🗑</button>
         </td></tr>`;
     }
@@ -406,6 +518,7 @@ function renderTable(){
       const a = b.dataset.a;
       if (a === "edit") openEditor(node, id);
       if (a === "open") call("open_url", `https://funpay.com/lots/offer?id=${id}`);
+      if (a === "dup") duplicateLot(node, id);
       if (a === "del") deleteLots([lot]);
     });
   });
@@ -453,6 +566,8 @@ $$("#bulk [data-bulk]").forEach(b => b.onclick = async () => {
   const a = b.dataset.bulk;
   if (a === "clear"){ S.picked.clear(); renderTable(); return; }
   if (a === "del"){ await deleteLots(lots); return; }
+  if (a === "price"){ bulkPrice(lots); return; }
+  if (a === "text"){ bulkText(lots); return; }
   const want = a === "on";
   const todo = lots.filter(l => l.active !== want);
   $$("#bulk button").forEach(x => x.disabled = true);
@@ -484,11 +599,11 @@ function fieldHtml(f, i){
   return `<div class="field">${label}<input id="${id}" data-i="${i}" type="text" value="${esc(f.value)}"></div>`;
 }
 
-async function openEditor(node, offer=null, categoryName=""){
+async function openEditor(node, offer=null, categoryName="", prefill=null){
   const L = $("#layer");
   const wrap = document.createElement("div");
   wrap.innerHTML = `<div class="overlay"></div><div class="drawer">
-    <div class="hd"><h2>${offer ? "Редактирование лота" : "Новый лот"}</h2><button class="ghost" data-a="x">✕</button></div>
+    <div class="hd"><h2>${offer ? "Редактирование лота" : prefill ? "Копия лота" : "Новый лот"}</h2><button class="ghost" data-a="x">✕</button></div>
     <div class="bd"><div class="loading"><span class="spin"></span> Загружаю форму…</div></div>
     <div class="ft"></div></div>`;
   L.append(wrap);
@@ -505,6 +620,7 @@ async function openEditor(node, offer=null, categoryName=""){
   catch(e){ wrap.querySelector(".bd").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
 
   const F = form.fields;
+  if (prefill) F.forEach(f => { if (f.kind !== "system" && f.name in prefill) f.value = prefill[f.name]; });
   const cat = S.cats.find(c => c.node === node);
   categoryName = categoryName || (cat && cat.name) || "";
   const main = [], en = [], tail = [];
@@ -519,7 +635,7 @@ async function openEditor(node, offer=null, categoryName=""){
   const rest = tail.filter(x => x !== price && x !== amount);
   const imgs = F.find(f => f.name === "fields[images]");
   let h = `<div class="muted" style="margin-bottom:12px">${esc(categoryName || form.title)}${offer ? ` · #${offer}` : ""}</div>`;
-  h += `<div class="ai-bar"><button data-ai="fill">✨ Заполнить с ИИ</button>${en.length ? '<button data-ai="tr">🌐 Перевести на английский</button>' : ""}</div>
+  h += `<div class="ai-bar"><button data-ai="fill">✨ Заполнить с ИИ</button>${en.length ? '<button data-ai="tr">🌐 Перевести на английский</button>' : ""}<button data-ai="tpl">📋 Шаблоны</button></div>
         <div class="ai-panel hidden" id="aiPanel">
           <div class="field"><label>Что продаёте?</label>
             <textarea id="aiBrief" placeholder="Например: аренда личного аккаунта ChatGPT Plus на 3 часа, выдача сразу после оплаты, +1 час за отзыв. Можно коротко — нейросеть сама оформит текст."></textarea>
@@ -558,6 +674,12 @@ async function openEditor(node, offer=null, categoryName=""){
   $$("[data-ai]", wrap).forEach(b => b.onclick = async () => {
     const a = b.dataset.ai, panel = $("#aiPanel", wrap);
     if (a === "fill"){ panel.classList.toggle("hidden"); if (!panel.classList.contains("hidden")) $("#aiBrief", wrap).focus(); return; }
+    if (a === "tpl"){
+      const textNow = {};
+      F.forEach((f, i) => { if (/^fields\[(summary|desc|payment_msg)\]/.test(f.name)){ const el = $(`[data-i="${i}"]`, wrap); if (el && el.value.trim()) textNow[f.name] = el.value; } });
+      openTemplates(textNow, tpl => { Object.entries(tpl.fields).forEach(([n, v]) => put(n, v)); if (Object.keys(tpl.fields).some(n => n.includes("[en]"))) openEn(); toast(`Шаблон «${tpl.name}» применён`); });
+      return;
+    }
     if (a === "close"){ panel.classList.add("hidden"); return; }
     if (a === "tr"){
       // Перевод работает и без ключа: тогда используется бесплатный переводчик MyMemory.
@@ -668,13 +790,16 @@ document.addEventListener("keydown", e => {
 
 /* ---------- вкладки ---------- */
 S.view = "lots";
+const VIEWS = { lots: "#viewLots", orders: "#viewOrders", chats: "#viewChats", fin: "#viewFin", stats: "#viewStats" };
 function setView(v){
   S.view = v;
   $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
-  $("#viewLots").classList.toggle("hidden", v !== "lots");
-  $("#viewFin").classList.toggle("hidden", v !== "fin");
+  Object.entries(VIEWS).forEach(([k, sel]) => $(sel).classList.toggle("hidden", k !== v));
   $(".lots-only").classList.toggle("hidden", v !== "lots");
   if (v === "fin" && !S.fin) loadFinance();
+  if (v === "orders" && !S.orders) loadOrders();
+  if (v === "chats" && !S.chatsLoaded) loadChats();
+  if (v === "stats" && !S.stats) renderStatsShell();
 }
 $$("#tabs button").forEach(b => b.onclick = () => setView(b.dataset.v));
 
@@ -892,7 +1017,7 @@ function showUpdate(u){
 $("#verBtn").onclick = () => checkUpdate(true);
 
 /* ---------- настройки ---------- */
-async function openSettings(){
+async function openSettings(section){
   const L = $("#layer");
   const wrap = document.createElement("div");
   wrap.innerHTML = `<div class="overlay top"></div><div class="modal"><div class="hd">Настройки</div>
@@ -907,7 +1032,28 @@ async function openSettings(){
   const tr = st.translator || "auto";
   const radio = (v, title, hint) => `<label class="chk" style="align-items:flex-start"><input type="radio" name="trMode" value="${v}" ${tr === v ? "checked" : ""} style="margin-top:3px">
       <span>${title}<br><span class="muted" style="font-size:12.5px">${hint}</span></span></label>`;
+  const sg = S.settings || {};
+  const chk = (k, title, hint="") => `<label class="chk" style="align-items:flex-start"><input type="checkbox" data-set="${k}" ${sg[k] ? "checked" : ""} style="margin-top:3px">
+      <span>${title}${hint ? `<br><span class="muted" style="font-size:12.5px">${hint}</span>` : ""}</span></label>`;
+  const bgHint = S.tray ? "Закрытие окна прячет приложение в трей (значок у часов). Выход — через меню значка."
+    : "Закрытие окна сворачивает приложение в Dock/панель задач. Выход — через меню приложения.";
   bd.innerHTML = `
+    <h4 style="margin:0 0 8px">Общие</h4>
+    <div class="field"><label>Тема</label><select data-set="theme">
+      <option value="auto" ${sg.theme === "auto" ? "selected" : ""}>Как в системе</option><option value="light" ${sg.theme === "light" ? "selected" : ""}>Светлая</option>
+      <option value="dark" ${sg.theme === "dark" ? "selected" : ""}>Тёмная</option></select></div>
+    ${chk("close_to_background", "Работать в фоне", bgHint + " Нужно, чтобы автоподнятие и уведомления работали при закрытом окне.")}
+    <div class="hint" style="margin-bottom:6px">Горячие клавиши: Ctrl/⌘+1…5 — вкладки, Ctrl/⌘+N — новый лот, Ctrl/⌘+F — поиск, Ctrl/⌘+R — обновить, Esc — закрыть окно.</div>
+    <h4 style="margin:14px 0 8px">Уведомления</h4>
+    ${chk("notify_orders", "Новые заказы")}${chk("notify_chats", "Новые сообщения в чатах")}${chk("notify_raise", "Каждое успешное автоподнятие")}
+    <h4 style="margin:14px 0 8px" id="rentSec">Аренда</h4>
+    <div class="hint" style="margin-bottom:6px">Срок аренды берётся из названия лота («НА 3 ЧАСА», «НА 30 МИНУТ»), отсчёт — от времени заказа.</div>
+    ${chk("rental_notify", "Напоминать за 10 минут до конца и по окончании аренды")}
+    <div class="field"><label>Бонусные минуты к сроку (например, 60 за отзыв)</label><input type="text" inputmode="numeric" data-set="rental_bonus" value="${esc(String(sg.rental_bonus || 0))}" style="max-width:120px"></div>
+    ${chk("rental_auto_msg", "Автоматически писать покупателю, когда аренда закончилась")}
+    <div class="field"><label>Текст сообщения ({buyer} — ник покупателя, {order} — номер заказа)</label>
+      <textarea data-set="rental_msg" rows="3">${esc(sg.rental_msg || "")}</textarea></div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
     <h4 style="margin:0 0 6px">Нейросеть (Claude)</h4>
     <p class="muted" style="margin:0 0 12px;font-size:13px">Нужна для «✨ Заполнить с ИИ» и для качественного перевода.
       Используется ключ Anthropic API — оплата по факту использования на вашем аккаунте Anthropic (одно описание обычно стоит доли цента–пару центов).</p>
@@ -930,6 +1076,18 @@ async function openSettings(){
     <div class="err" id="trErr"></div>`;
   wrap.querySelector(".ft").innerHTML = `<div class="spacer"></div><button data-a="no">Закрыть</button>`;
   wrap.querySelector("[data-a=no]").onclick = close;
+  // Общие настройки сохраняются сразу при изменении.
+  wrap.querySelectorAll("[data-set]").forEach(el => el.addEventListener("change", async () => {
+    const k = el.dataset.set, v = el.type === "checkbox" ? el.checked : el.value;
+    try{
+      const saved = await call("set_setting", k, v);
+      S.settings[k] = saved;
+      if (k === "theme") applyTheme(saved);
+      if (k === "rental_bonus" && S.view === "orders") loadRentals();
+      toast("Сохранено");
+    }catch(x){ toast(x.message, true); }
+  }));
+  if (section === "rent") setTimeout(() => $("#rentSec", wrap).scrollIntoView({ block: "start" }), 50);
   $("#aiShow", wrap).onclick = () => { const k = $("#aiKey", wrap); k.type = k.type === "password" ? "text" : "password"; };
   $("#aiConsole", wrap).onclick = () => call("open_url", "https://console.anthropic.com/settings/keys");
   const del = $("#aiDel", wrap);
@@ -948,14 +1106,488 @@ async function openSettings(){
     catch(x){ err.textContent = x.message; }
   };
 }
-$("#setBtn").onclick = openSettings;
+$("#setBtn").onclick = () => openSettings();
+
+/* ---------- общие помощники ---------- */
+function modalBox(title, body, foot, wide=false){
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `<div class="overlay top"></div><div class="modal" style="${wide ? "width:min(760px,calc(100% - 32px))" : ""}">
+    <div class="hd">${esc(title)}</div><div class="bd">${body}</div><div class="ft">${foot}</div></div>`;
+  $("#layer").append(wrap);
+  const close = () => wrap.remove();
+  wrap.querySelector(".overlay").onclick = close;
+  wrap.querySelectorAll("[data-a=no]").forEach(b => b.onclick = close);
+  return { wrap, close, q: s => wrap.querySelector(s), qa: s => [...wrap.querySelectorAll(s)] };
+}
+const fmtLeft = s => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}` : `${m}:${String(ss).padStart(2, "0")}`; };
+const fmtTime = ts => new Date(ts * 1000).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const fmtDur = min => !min ? "—" : min % 1440 === 0 ? `${min / 1440} дн.` : min % 60 === 0 ? `${min / 60} ч` : `${min} мин`;
+const money = (obj) => Object.entries(obj || {}).map(([u, v]) => `${(+v).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ${u}`).join(" + ") || "0";
+
+function applyTheme(t){
+  if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  else delete document.documentElement.dataset.theme;
+}
+
+/* ---------- события фоновых задач ---------- */
+async function pollEvents(){
+  if (!API || $("#main").classList.contains("hidden")) return;
+  let ev = [];
+  try{ ev = await call("events"); }catch(_){ return; }
+  for (const e of ev){
+    if (e.kind === "notify") toast(`${e.title}: ${e.text}`);
+    if (e.kind === "autoraise") refreshRaiseChip();
+    if (e.kind === "chats"){ $("#chatDot").classList.remove("hidden"); if (S.view === "chats") loadChats(true); }
+    if (e.kind === "orders" && S.view === "orders") loadOrders();
+    if (e.kind === "rentals" && S.view === "orders") loadRentals();
+  }
+}
+
+/* ---------- горячие клавиши ---------- */
+document.addEventListener("keydown", e => {
+  const mod = e.ctrlKey || e.metaKey;
+  if (!mod || $("#main").classList.contains("hidden")) return;
+  const k = e.key.toLowerCase();
+  const tabs = { "1": "lots", "2": "orders", "3": "chats", "4": "fin", "5": "stats" };
+  if (tabs[k]){ e.preventDefault(); setView(tabs[k]); return; }
+  if ((k === "n" || k === "т") && S.view === "lots" && !$("#layer").children.length){ e.preventDefault(); $("#newBtn").click(); return; }
+  if (k === "f" || k === "а"){
+    const inp = S.view === "lots" ? $("#q") : S.view === "orders" ? $("#oq") : null;
+    if (inp){ e.preventDefault(); inp.focus(); inp.select(); }
+    return;
+  }
+  if (k === "r" || k === "к"){
+    e.preventDefault();
+    if (S.view === "lots") loadLots(); else if (S.view === "orders") loadOrders(); else if (S.view === "chats") loadChats(true);
+    else if (S.view === "fin") loadFinance(); else if (S.view === "stats") renderStatsShell(true);
+  }
+});
+
+/* ---------- дублирование ---------- */
+async function duplicateLot(node, id){
+  toast("Копирую лот…");
+  try{
+    const f = await call("form", node, id);
+    const pre = {};
+    f.fields.forEach(x => { if (x.kind !== "system" && x.name !== "fields[images]") pre[x.name] = x.value; });
+    pre["fields[images]"] = (f.fields.find(x => x.name === "fields[images]") || {}).value || "";
+    const cat = S.cats.find(c => c.node === node);
+    openEditor(node, null, cat ? cat.name : "", pre);
+  }catch(e){ toast(e.message, true); }
+}
+
+/* ---------- массовые правки ---------- */
+async function runBulk(lots, args, label){
+  let ok = 0, same = 0, fail = 0;
+  const m = modalBox(label, `<div class="bar"><i style="width:0"></i></div><div class="muted" id="bp">0 / ${lots.length}</div><div class="err" id="be" style="white-space:pre-line"></div>`, "");
+  for (let i = 0; i < lots.length; i++){
+    const l = lots[i];
+    try{ const r = await call("bulk_edit", l.node, l.id, args.replace || [], args.price || null); r.changed ? ok++ : same++; }
+    catch(e){ fail++; m.q("#be").textContent += `#${l.id}: ${e.message}\n`; }
+    m.q(".bar i").style.width = Math.round((i + 1) / lots.length * 100) + "%";
+    m.q("#bp").textContent = `${i + 1} / ${lots.length}`;
+  }
+  m.q(".ft").innerHTML = `<button class="primary" data-a="no">Готово</button>`;
+  m.q("[data-a=no]").onclick = m.close;
+  m.q("#bp").textContent = `Изменено: ${ok} · без изменений: ${same}${fail ? ` · ошибок: ${fail}` : ""}`;
+  loadLots();
+}
+function bulkPrice(lots){
+  const m = modalBox(`Цена: ${lots.length} лот(ов)`, `
+    <div class="field"><label>Как изменить</label><select id="pm">
+      <option value="set">Поставить точную цену</option><option value="percent">Изменить на %</option><option value="add">Прибавить / вычесть сумму</option></select></div>
+    <div class="field"><label id="pl">Новая цена</label><input type="text" id="pv" inputmode="decimal" placeholder="например 5 или -10"></div>
+    <div class="hint">Цена — та, что вы получаете (без комиссии FunPay), как в форме лота. Округление до 0.01.</div><div class="err" id="perr"></div>`,
+    `<button data-a="no">Отмена</button><button class="primary" id="pgo">Применить</button>`);
+  const lbl = { set: "Новая цена", percent: "Процент (например 10 или -15)", add: "Сумма (например 1.5 или -2)" };
+  m.q("#pm").onchange = e => m.q("#pl").textContent = lbl[e.target.value];
+  m.q("#pv").focus();
+  m.q("#pgo").onclick = () => {
+    const v = parseFloat(m.q("#pv").value.replace(",", "."));
+    if (isNaN(v)){ m.q("#perr").textContent = "Введите число"; return; }
+    m.close(); runBulk(lots, { price: { mode: m.q("#pm").value, value: v } }, "Изменение цен");
+  };
+}
+function bulkText(lots){
+  const m = modalBox(`Замена текста: ${lots.length} лот(ов)`, `
+    <div class="field"><label>Найти</label><input type="text" id="tf" placeholder="+1 ЧАС ЗА ОТЗЫВ"></div>
+    <div class="field"><label>Заменить на</label><input type="text" id="tt" placeholder="+2 ЧАСА ЗА ОТЗЫВ"></div>
+    <div class="hint">Заменяется во всех текстах лота: краткое и подробное описание, сообщение после оплаты (русская и английская версии). Регистр учитывается.</div>
+    <div class="err" id="terr"></div>`, `<button data-a="no">Отмена</button><button class="primary" id="tgo">Заменить</button>`);
+  m.q("#tf").focus();
+  m.q("#tgo").onclick = () => {
+    const f = m.q("#tf").value;
+    if (!f){ m.q("#terr").textContent = "Что искать?"; return; }
+    m.close(); runBulk(lots, { replace: [{ find: f, to: m.q("#tt").value }] }, "Замена текста");
+  };
+}
+
+/* ---------- шаблоны ---------- */
+async function openTemplates(current, onApply){
+  let list = [];
+  try{ list = await call("templates"); }catch(e){ toast(e.message, true); return; }
+  const m = modalBox("Шаблоны описаний", "", `<button data-a="no">Закрыть</button>`);
+  const draw = () => {
+    m.q(".bd").innerHTML = (list.length ? list.map(t => `<div class="pick" data-id="${esc(t.id)}"><span><b>${esc(t.name)}</b><br>
+        <span class="muted" style="font-size:12px">${esc((t.fields["fields[summary][ru]"] || t.fields["fields[desc][ru]"] || "").slice(0, 80))}</span></span>
+        <span class="g"><button class="primary" data-act="use">Применить</button> <button class="ghost danger" data-act="del">🗑</button></span></div>`).join("")
+      : '<div class="empty">Шаблонов пока нет</div>')
+      + `<hr style="border:0;border-top:1px solid var(--line);margin:12px 0"><div class="field"><label>Сохранить текущие тексты лота как шаблон</label>
+         <div class="inrow"><input type="text" id="tn" placeholder="Название шаблона"><button id="tsave" ${Object.keys(current).length ? "" : "disabled"}>Сохранить</button></div>
+         <div class="hint">Сохраняются краткое и подробное описание и сообщение после оплаты (RU и EN). Применение заменяет эти поля в открытом лоте.</div></div>`;
+    m.qa("[data-act=use]").forEach(b => b.onclick = () => { const t = list.find(x => x.id === b.closest(".pick").dataset.id); m.close(); onApply(t); });
+    m.qa("[data-act=del]").forEach(b => b.onclick = async () => { list = await call("template_delete", b.closest(".pick").dataset.id); draw(); });
+    m.q("#tsave").onclick = async () => {
+      try{ list = await call("template_save", m.q("#tn").value, current); toast("Шаблон сохранён"); draw(); }catch(e){ toast(e.message, true); }
+    };
+  };
+  draw();
+}
+
+/* ---------- бэкап ---------- */
+$("#moreBtn").onclick = e => {
+  e.stopPropagation();
+  const old = $("#accMenu"); if (old) old.remove();
+  const r = e.currentTarget.getBoundingClientRect();
+  const m = document.createElement("div");
+  m.id = "accMenu"; m.className = "menu"; m.style.left = Math.max(8, r.right - 260) + "px"; m.style.top = (r.bottom + 6) + "px";
+  m.innerHTML = `<button data-b="save">💾 Сохранить бэкап всех лотов…</button><button data-b="load">📂 Восстановить из бэкапа…</button>`;
+  document.body.append(m);
+  m.querySelector("[data-b=save]").onclick = () => { m.remove(); backupAll(); };
+  m.querySelector("[data-b=load]").onclick = () => { m.remove(); restoreBackup(); };
+};
+async function backupAll(){
+  const lots = allLots();
+  if (!lots.length){ toast("Нет лотов для бэкапа", true); return; }
+  const m = modalBox("Бэкап лотов", `<div class="bar"><i style="width:0"></i></div><div class="muted" id="bp">Читаю лоты: 0 / ${lots.length}</div><div class="err" id="be"></div>`, "");
+  const out = [];
+  for (let i = 0; i < lots.length; i++){
+    const l = lots[i];
+    try{ out.push(await call("backup_lot", l.node, l.id, l.cat)); }catch(e){ m.q("#be").textContent += `#${l.id}: ${e.message}\n`; }
+    m.q(".bar i").style.width = Math.round((i + 1) / lots.length * 100) + "%";
+    m.q("#bp").textContent = `Читаю лоты: ${i + 1} / ${lots.length}`;
+  }
+  try{
+    const path = await call("backup_save", out);
+    m.close();
+    if (path) toast(`Бэкап сохранён: ${out.length} лотов`);
+  }catch(e){ m.close(); toast(e.message, true); }
+}
+async function restoreBackup(){
+  let b;
+  try{ b = await call("backup_open"); }catch(e){ toast(e.message, true); return; }
+  if (!b) return;
+  const m = modalBox(`Восстановление: ${b.lots.length} лотов`, `
+    <div class="muted" style="margin-bottom:8px">Бэкап ${esc(b.account || "")} от ${esc(b.created || "?")}. Лоты будут созданы <b>заново</b> (существующие не меняются).</div>
+    <label class="chk"><input type="checkbox" id="rall" checked> Выбрать все</label>
+    <div id="rl" style="max-height:300px;overflow:auto">${b.lots.map((l, i) => `<label class="chk"><input type="checkbox" data-i="${i}" checked>
+      <span>${esc(l.title || "(без названия)")} <span class="muted" style="font-size:12px">· ${esc(l.category || "#" + l.node)}</span></span></label>`).join("")}</div>
+    <label class="chk" style="margin-top:10px"><input type="checkbox" id="rin" checked> Создать выключенными (проверите и включите сами)</label>
+    <div class="bar hidden"><i style="width:0"></i></div><div class="err" id="re" style="white-space:pre-line"></div>`,
+    `<button data-a="no">Отмена</button><button class="primary" id="rgo">Восстановить</button>`, true);
+  m.q("#rall").onchange = e => m.qa("#rl input").forEach(x => x.checked = e.target.checked);
+  m.q("#rgo").onclick = async e => {
+    const picked = m.qa("#rl input:checked").map(x => b.lots[+x.dataset.i]);
+    if (!picked.length) return;
+    e.currentTarget.disabled = true; m.q(".bar").classList.remove("hidden");
+    let ok = 0;
+    for (let i = 0; i < picked.length; i++){
+      try{ await call("backup_restore", picked[i], m.q("#rin").checked); ok++; }
+      catch(x){ m.q("#re").textContent += `${picked[i].title.slice(0, 40)}: ${x.message}\n`; }
+      m.q(".bar i").style.width = Math.round((i + 1) / picked.length * 100) + "%";
+    }
+    toast(`Создано лотов: ${ok}`);
+    m.q(".ft").innerHTML = `<button class="primary" data-a="no">Готово</button>`; m.q("[data-a=no]").onclick = m.close;
+    loadLots();
+  };
+}
+
+/* ---------- автоподнятие ---------- */
+async function refreshRaiseChip(){
+  try{
+    const st = await call("autoraise_state");
+    const chip = $("#raiseChip");
+    if (!st.enabled){ chip.textContent = "выкл"; chip.className = "chip"; return; }
+    const nexts = Object.values(st.next || {}).filter(Boolean);
+    const soon = nexts.length ? Math.min(...nexts) : 0;
+    chip.className = "chip on";
+    const left = soon - Date.now() / 1000, h = Math.floor(left / 3600), mi = Math.ceil(left % 3600 / 60);
+    chip.textContent = !soon ? "вкл" : left <= 60 ? "сейчас" : "через " + (h ? `${h} ч ${mi} мин` : `${mi} мин`);
+  }catch(_){}
+}
+setInterval(refreshRaiseChip, 60000);
+$("#raiseBtn").onclick = async () => {
+  let st;
+  try{ st = await call("autoraise_state"); }catch(e){ toast(e.message, true); return; }
+  const cats = S.cats.filter(c => !c.error);
+  const sel = new Set((st.nodes && st.nodes.length) ? st.nodes : cats.map(c => c.node));
+  const gameOf = n => (S.cats.find(c => c.node === n) || {}).game;
+  const lastFor = c => (st.last || {})[String(c.game)];
+  const nextFor = c => (st.next || {})[String(c.game)];
+  const bgHint = st.background ? "" : `<div class="warnbox">Автоподнятие работает, пока приложение запущено. Чтобы оно не выключалось при закрытии окна,
+     включите «Работать в фоне» в ⚙ — окно будет ${S.tray ? "сворачиваться в трей" : "сворачиваться"}.</div>`;
+  const m = modalBox("Автоподнятие лотов", `
+    <label class="chk"><input type="checkbox" id="are" ${st.enabled ? "checked" : ""}> <b>Поднимать лоты автоматически</b></label>
+    <div class="hint" style="margin:0 0 10px 24px">Приложение поднимает лоты, как только FunPay это разрешает, и само ждёт нужное время.</div>
+    ${bgHint}
+    <table><thead><tr><th style="width:32px"></th><th>Раздел</th><th>Последняя попытка</th><th>Следующая</th><th></th></tr></thead><tbody>
+    ${cats.map(c => { const l = lastFor(c), n = nextFor(c); return `<tr><td><input type="checkbox" data-n="${c.node}" ${sel.has(c.node) ? "checked" : ""}></td>
+      <td>${esc(c.name)}</td><td class="muted" style="font-size:12.5px">${l ? `${fmtTime(l.ts)} · ${esc(l.msg)}` : "—"}</td>
+      <td class="muted" style="font-size:12.5px">${n ? (n * 1000 > Date.now() ? "через " + fmtLeft(n - Date.now() / 1000) : "сейчас") : "—"}</td>
+      <td><button class="ghost" data-raise="${c.node}">Поднять</button></td></tr>`; }).join("")}
+    </tbody></table>
+    <div class="hint">Разделы одной игры FunPay поднимает вместе.</div>`,
+    `<button data-a="no">Закрыть</button><button class="primary" id="asave">Сохранить</button>`, true);
+  m.qa("[data-raise]").forEach(b => b.onclick = async () => {
+    b.disabled = true; b.innerHTML = '<span class="spin"></span>';
+    try{ const r = await call("raise_now", +b.dataset.raise); toast(r.ok ? "Лоты подняты" : r.msg, !r.ok && !r.wait); }
+    catch(e){ toast(e.message, true); }
+    b.disabled = false; b.textContent = "Поднять"; refreshRaiseChip();
+  });
+  m.q("#asave").onclick = async () => {
+    const nodes = m.qa("[data-n]:checked").map(x => +x.dataset.n);
+    try{ await call("autoraise_set", m.q("#are").checked, nodes); toast(m.q("#are").checked ? "Автоподнятие включено" : "Автоподнятие выключено"); m.close(); refreshRaiseChip(); }
+    catch(e){ toast(e.message, true); }
+  };
+};
+
+/* ---------- заказы и аренды ---------- */
+S.ord = { state: "", items: [], next: "", q: "" };
+const ST = { paid: ["Ожидает", "waiting"], closed: ["Закрыт", "complete"], refunded: ["Возврат", "cancel"] };
+async function loadOrders(more=false){
+  const box = $("#ordersBox");
+  if (!more){
+    box.innerHTML = `<div class="sec-h"><h3>Аренды</h3><span class="muted" style="font-size:12.5px">по заказам с «НА N ЧАСОВ» в названии</span><div class="spacer"></div>
+      <button class="ghost" id="rset">Настроить</button></div><div id="rentBox" class="cards"><div class="loading"><span class="spin"></span></div></div>
+      <div class="sec-h"><h3>Заказы</h3><div class="spacer"></div>
+      <input type="search" id="oq" placeholder="Покупатель, номер или лот…" style="max-width:280px" value="${esc(S.ord.q)}">
+      <div class="seg" id="ost">${[["", "Все"], ["paid", "Ожидают"], ["closed", "Закрытые"], ["refunded", "Возвраты"]].map(([v, t]) =>
+        `<button data-s="${v}" class="${S.ord.state === v ? "on" : ""}">${t}</button>`).join("")}</div></div>
+      <div id="ordTable"><div class="loading"><span class="spin"></span> Загружаю заказы…</div></div>`;
+    $("#rset").onclick = () => openSettings("rent");
+    $("#oq").oninput = e => { S.ord.q = e.target.value; renderOrders(); };
+    $$("#ost button").forEach(b => b.onclick = () => { S.ord.state = b.dataset.s; loadOrders(); });
+    S.ord.items = []; S.ord.next = "";
+    loadRentals();
+  }
+  try{
+    const r = await call("orders", S.ord.next, S.ord.state);
+    S.ord.items = S.ord.items.concat(r.items); S.ord.next = r.next; S.orders = true;
+    renderOrders();
+  }catch(e){ $("#ordTable").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+function renderOrders(){
+  const q = S.ord.q.trim().toLowerCase();
+  const it = S.ord.items.filter(o => !q || (o.id + " " + o.buyer + " " + o.title).toLowerCase().includes(q));
+  $("#ordTable").innerHTML = !it.length ? '<div class="empty">Заказов нет</div>' : `<table><thead><tr><th>Дата</th><th>Заказ</th><th>Покупатель</th><th>Статус</th><th class="num">Сумма</th></tr></thead><tbody>${
+    it.map(o => `<tr class="clickable" data-id="${esc(o.id)}"><td style="white-space:nowrap">${esc(o.date)}</td>
+      <td class="title"><div class="t">${esc(o.title)}</div><div class="sub">#${esc(o.id)} · ${esc(o.category)}</div></td>
+      <td>${esc(o.buyer)}</td><td><span class="badge ${(ST[o.status] || [])[1] || ""}">${esc(o.status_text || (ST[o.status] || [])[0])}</span></td>
+      <td class="amt">${esc(o.amount)} ${esc(o.unit)}</td></tr>`).join("")}</tbody></table>
+    ${S.ord.next && !q ? '<div class="more"><button id="omore">Показать ещё</button></div>' : ""}`;
+  $$("#ordTable tr[data-id]").forEach(tr => tr.onclick = () => openOrder(tr.dataset.id));
+  const mo = $("#omore"); if (mo) mo.onclick = () => { mo.disabled = true; loadOrders(true); };
+}
+S.rent = [];
+async function loadRentals(){
+  try{ S.rent = await call("rentals"); }catch(e){ $("#rentBox").innerHTML = `<div class="muted">${esc(e.message)}</div>`; return; }
+  drawRentals();
+}
+function drawRentals(){
+  const box = $("#rentBox"); if (!box) return;
+  if (!S.rent.length){ box.innerHTML = '<div class="muted" style="font-size:13px">Сейчас активных аренд нет.</div>'; return; }
+  const now = Date.now() / 1000;
+  box.innerHTML = S.rent.map(r => { const left = r.end - now, total = r.minutes * 60, pct = Math.min(100, Math.max(0, 100 - left / total * 100));
+    return `<div class="rcard ${left <= 0 ? "over" : left < 600 ? "soon" : ""}">
+      <div class="row"><b>${esc(r.buyer)}</b><span class="muted" style="font-size:12px">#${esc(r.id)} · ${fmtDur(r.minutes)}</span></div>
+      <div class="big">${left > 0 ? fmtLeft(left) : "закончилась " + fmtLeft(-left) + " назад"}</div>
+      <div class="bar2"><i style="width:${pct}%"></i></div>
+      <div class="muted" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.title)}</div>
+      <div class="row"><span class="muted" style="font-size:12px">до ${fmtTime(r.end)}</span><div class="spacer"></div><button class="ghost" data-o="${esc(r.id)}">Заказ →</button></div></div>`; }).join("");
+  box.querySelectorAll("[data-o]").forEach(b => b.onclick = () => openOrder(b.dataset.o));
+}
+setInterval(() => { if (S.view === "orders") drawRentals(); }, 1000);
+
+async function openOrder(id){
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `<div class="overlay"></div><div class="drawer"><div class="hd"><h2>Заказ #${esc(id)}</h2><button class="ghost" data-a="x">✕</button></div>
+    <div class="bd"><div class="loading"><span class="spin"></span></div></div><div class="ft"></div></div>`;
+  $("#layer").append(wrap);
+  const close = () => wrap.remove();
+  wrap.querySelector(".overlay").onclick = close; wrap.querySelector("[data-a=x]").onclick = close;
+  let o;
+  try{ o = await call("order", id); }catch(e){ wrap.querySelector(".bd").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  const rv = o.review;
+  wrap.querySelector(".bd").innerHTML = `
+    <div class="muted" style="margin-bottom:10px">Покупатель: <b>${esc(o.buyer || "—")}</b> · ${esc(o.status || "")}</div>
+    <div class="params">${o.params.map(p => `<div class="k">${esc(p.name)}</div><div class="v">${esc(p.value)}</div>`).join("")}</div>
+    <div class="review"><b>Отзыв</b> ${rv.rating ? `<span class="stars">${"★".repeat(rv.rating)}${"☆".repeat(5 - rv.rating)}</span>` : ""}
+      <div style="margin:6px 0">${rv.text ? esc(rv.text) : '<span class="muted">Отзыва нет</span>'}</div>
+      ${rv.reply ? `<div class="muted" style="font-size:13px">Ваш ответ: ${esc(rv.reply)}</div>` : ""}
+      ${rv.can_reply ? `<div class="field" style="margin-top:8px"><textarea id="rr" rows="3" placeholder="${rv.reply ? "Изменить ответ…" : "Ответ на отзыв…"}">${esc(rv.reply || "")}</textarea></div>
+        <div class="row"><button class="ghost" id="rai">✨ Черновик ИИ</button><div class="spacer"></div><button class="primary" id="rsend">${rv.reply ? "Обновить ответ" : "Ответить"}</button></div>` : ""}
+    </div>`;
+  wrap.querySelector(".ft").innerHTML = `${o.can_refund ? '<button class="danger" id="oref">Вернуть деньги</button>' : ""}
+    <div class="spacer"></div><button class="ghost" id="osite">На сайте ↗</button>${o.chat_id ? '<button class="primary" id="ochat">Открыть чат</button>' : ""}`;
+  const q = s => wrap.querySelector(s);
+  q("#osite").onclick = () => call("open_url", `https://funpay.com/orders/${id}/`);
+  if (q("#ochat")) q("#ochat").onclick = () => { close(); openChatById(o.chat_id, o.buyer); };
+  if (q("#oref")) q("#oref").onclick = async () => {
+    if (!await confirmBox("Вернуть деньги?", `Покупатель ${o.buyer} получит деньги за заказ #${id}. Это нельзя отменить; отзыв покупателя может быть удалён.`, "Вернуть деньги")) return;
+    try{ await call("refund", id); toast("Деньги возвращены"); close(); loadOrders(); }catch(e){ toast(e.message, true); }
+  };
+  if (q("#rai")) q("#rai").onclick = async e => {
+    const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spin"></span> Пишу…';
+    try{ q("#rr").value = (await call("ai_review_reply", id, "")).text; }catch(x){ toast(x.message, true); if (/ключ/i.test(x.message)) openSettings(); }
+    b.disabled = false; b.textContent = "✨ Черновик ИИ";
+  };
+  if (q("#rsend")) q("#rsend").onclick = async () => {
+    try{ await call("review_reply", id, q("#rr").value); toast("Ответ на отзыв опубликован"); close(); }catch(e){ toast(e.message, true); }
+  };
+}
+
+/* ---------- чаты ---------- */
+S.chats = [];
+async function loadChats(silent=false){
+  if (!silent) $("#chatList").innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  if (!S.chat) $("#chatPane").innerHTML = '<div class="empty" style="grid-row:1/4">Выберите чат слева</div>';
+  try{ S.chats = await call("chats"); S.chatsLoaded = true; }catch(e){ $("#chatList").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  $("#chatDot").classList.toggle("hidden", !S.chats.some(c => c.unread));
+  $("#chatList").innerHTML = S.chats.map(c => `<div class="citem ${c.unread ? "unread" : ""} ${S.chat && S.chat.id === c.id ? "sel" : ""}" data-id="${c.id}">
+    <div class="n">${c.unread ? "● " : ""}${esc(c.name)}<span class="t">${esc(c.time)}</span></div><div class="l">${esc(c.last)}</div></div>`).join("") || '<div class="empty">Чатов нет</div>';
+  $$("#chatList .citem").forEach(d => d.onclick = () => openChatById(+d.dataset.id, (S.chats.find(c => c.id === +d.dataset.id) || {}).name));
+  if (S.chat && silent) refreshChat();
+}
+async function openChatById(id, name){
+  setView("chats");
+  S.chat = { id, name: name || "" };
+  $$("#chatList .citem").forEach(d => d.classList.toggle("sel", +d.dataset.id === id));
+  $("#chatPane").innerHTML = `<div class="chat-hd"><b>${esc(S.chat.name)}</b><div class="spacer"></div><button class="ghost" id="csite">На сайте ↗</button></div>
+    <div class="msgs" id="msgs"><div class="loading"><span class="spin"></span></div></div>
+    <div class="composer"><textarea id="ctext" rows="2" placeholder="Сообщение… (Ctrl+Enter — отправить)"></textarea>
+      <div style="display:flex;flex-direction:column;gap:6px"><button class="primary" id="csend">Отправить</button><button class="ghost" id="cai" title="Черновик ответа нейросетью">✨ ИИ</button></div></div>`;
+  $("#csite").onclick = () => call("open_url", `https://funpay.com/chat/?node=${id}`);
+  $("#ctext").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); $("#csend").click(); } });
+  $("#csend").onclick = async e => {
+    const t = $("#ctext").value.trim(); if (!t) return;
+    const b = e.currentTarget; b.disabled = true;
+    try{ await call("send_message", id, t); $("#ctext").value = ""; await refreshChat(); }catch(x){ toast(x.message, true); }
+    b.disabled = false;
+  };
+  $("#cai").onclick = async e => {
+    const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spin"></span>';
+    try{ $("#ctext").value = (await call("ai_chat_reply", id, $("#ctext").value)).text; $("#ctext").focus(); }
+    catch(x){ toast(x.message, true); if (/ключ/i.test(x.message)) openSettings(); }
+    b.disabled = false; b.textContent = "✨ ИИ";
+  };
+  await refreshChat(true);
+}
+async function refreshChat(scroll=false){
+  if (!S.chat) return;
+  const id = S.chat.id;
+  let h; try{ h = await call("chat_history", id); }catch(e){ $("#msgs").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if (!S.chat || S.chat.id !== id) return;
+  const box = $("#msgs"); const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  box.innerHTML = h.messages.map(m => `<div class="msg ${m.system ? "sys" : m.mine ? "mine" : ""}">${m.text ? esc(m.text) : ""}${m.image ? `<a class="lnk" data-img="${esc(m.image)}">🖼 картинка</a>` : ""}
+    <div class="meta">${m.system ? "FunPay" : esc(m.name || "")} · ${esc(m.time)}</div></div>`).join("") || '<div class="empty">Сообщений нет</div>';
+  box.querySelectorAll("[data-img]").forEach(a => a.onclick = () => call("open_url", a.dataset.img.startsWith("http") ? a.dataset.img : "https://funpay.com" + a.dataset.img));
+  if (scroll || atBottom) box.scrollTop = box.scrollHeight;
+}
+setInterval(() => { if (S.view === "chats" && S.chat) refreshChat(); }, 10000);
+setInterval(() => { if (S.view === "chats") loadChats(true); }, 30000);
+
+/* ---------- аналитика ---------- */
+S.statTab = "sales"; S.days = 30;
+function renderStatsShell(force=false){
+  S.stats = true;
+  $("#statsBox").innerHTML = `<div class="sec-h"><div class="seg" id="stTab"><button data-t="sales" class="${S.statTab === "sales" ? "on" : ""}">Продажи</button>
+    <button data-t="comp" class="${S.statTab === "comp" ? "on" : ""}">Цены конкурентов</button></div><div class="spacer"></div><span id="stCtl"></span></div><div id="stBody"></div>`;
+  $$("#stTab button").forEach(b => b.onclick = () => { S.statTab = b.dataset.t; renderStatsShell(); });
+  S.statTab === "sales" ? loadSales() : loadComp();
+}
+async function loadSales(){
+  $("#stCtl").innerHTML = `<div class="seg" id="stDays">${[7, 30, 90].map(d => `<button data-d="${d}" class="${S.days === d ? "on" : ""}">${d} дней</button>`).join("")}</div>`;
+  $$("#stDays button").forEach(b => b.onclick = () => { S.days = +b.dataset.d; loadSales(); });
+  $("#stBody").innerHTML = '<div class="loading"><span class="spin"></span> Считаю продажи…</div>';
+  let s; try{ s = await call("stats", S.days); }catch(e){ $("#stBody").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  const u = s.unit, t = s.totals;
+  $("#stBody").innerHTML = `
+    <div class="kpis">
+      <div class="kpi"><div class="l">Выручка</div><div class="v">${esc(money(t.revenue))}</div><div class="s">за ${s.days} дн., без возвратов</div></div>
+      <div class="kpi"><div class="l">Продаж</div><div class="v">${t.orders}</div><div class="s">${s.buyers} покупателей</div></div>
+      <div class="kpi"><div class="l">Средний чек</div><div class="v">${s.avg} ${esc(u)}</div><div class="s">в основной валюте</div></div>
+      <div class="kpi"><div class="l">Возвраты</div><div class="v">${t.refunds}</div><div class="s">${esc(money(t.refund_sum))}</div></div>
+      <div class="kpi"><div class="l">Повторные покупатели</div><div class="v">${s.repeat_buyers}</div><div class="s">купили больше 1 раза</div></div>
+    </div>
+    <div class="chart" id="chart"><h4>Выручка по дням, ${esc(u)}</h4><div class="tip" id="tip"></div></div>
+    <div class="sec-h"><h3>Лучшие лоты</h3></div>
+    ${s.top.length ? `<table><thead><tr><th>Лот</th><th class="num">Продаж</th><th class="num">Выручка</th></tr></thead><tbody>${s.top.map(x =>
+      `<tr><td class="title"><div class="t">${esc(x.title)}</div><div class="sub">${esc(x.category)}</div></td><td class="num">${x.orders}</td><td class="amt">${esc(money(x.revenue))}</td></tr>`).join("")}</tbody></table>`
+      : '<div class="empty">Продаж за период нет</div>'}`;
+  drawChart(s.by_day.map(d => ({ date: d.date, v: d.revenue[u] || 0, n: d.orders, r: d.refunds })), u);
+}
+function drawChart(data, unit){
+  const box = $("#chart"), W = Math.max(320, box.clientWidth - 28), H = 220, pl = 44, pr = 6, pt = 8, pb = 24;
+  const max = Math.max(1, ...data.map(d => d.v));
+  const step = (() => { const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw))); return [1, 2, 2.5, 5, 10].map(m => m * p).find(s => s >= raw); })();
+  const top = Math.ceil(max / step) * step;
+  const iw = W - pl - pr, ih = H - pt - pb, bw = iw / data.length;
+  const y = v => pt + ih - v / top * ih;
+  let g = "";
+  for (let v = 0; v <= top + 1e-9; v += step) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${pl - 6}" y="${y(v) + 4}" text-anchor="end">${+v.toFixed(2)}</text>`;
+  const every = Math.ceil(data.length / 10);
+  let bars = "";
+  data.forEach((d, i) => {
+    const x = pl + i * bw, w = Math.max(1, bw - 2), h = Math.max(0, ih - (y(d.v) - pt)), r = Math.min(4, w / 2, h);
+    const bx = x + 1, by = y(d.v);
+    const path = h > 0 ? `M${bx},${pt + ih} V${by + r} Q${bx},${by} ${bx + r},${by} H${bx + w - r} Q${bx + w},${by} ${bx + w},${by + r} V${pt + ih} Z` : "";
+    bars += `<rect class="hit" x="${x}" y="${pt}" width="${bw}" height="${ih}" data-i="${i}"/>${path ? `<path class="bar" d="${path}" data-i="${i}"/>` : ""}`;
+    if (i % every === 0) bars += `<text class="ax" x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${d.date.slice(8)}.${d.date.slice(5, 7)}</text>`;
+  });
+  box.insertAdjacentHTML("beforeend", `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:${H}px"><g class="grid">${g}</g>${bars}</svg>`);
+  const tip = $("#tip");
+  box.querySelectorAll(".hit").forEach(r => {
+    r.onmouseenter = () => { const d = data[+r.dataset.i]; const b = box.querySelector(`.bar[data-i="${r.dataset.i}"]`); if (b) b.classList.add("hl");
+      tip.innerHTML = `<b>${d.date.slice(8)}.${d.date.slice(5, 7)}</b> · ${d.v.toLocaleString("ru-RU")} ${esc(unit)}<br>продаж: ${d.n}${d.r ? ` · возвратов: ${d.r}` : ""}`;
+      const rect = r.getBoundingClientRect(), br = box.getBoundingClientRect();
+      tip.style.left = (rect.left - br.left + rect.width / 2) + "px"; tip.style.top = (y(d.v) / H * r.ownerSVGElement.getBoundingClientRect().height + 30) + "px"; tip.style.display = "block"; };
+    r.onmouseleave = () => { tip.style.display = "none"; box.querySelectorAll(".bar.hl").forEach(b => b.classList.remove("hl")); };
+  });
+}
+async function loadComp(){
+  if (!S.cats.length){ try{ S.cats = await call("lots"); }catch(_){} }
+  const cats = S.cats.filter(c => !c.error && c.lots.length);
+  S.compNode = S.compNode && cats.some(c => c.node === S.compNode) ? S.compNode : (cats[0] || {}).node;
+  $("#stCtl").innerHTML = `<select id="cn" style="min-width:240px">${cats.map(c => `<option value="${c.node}" ${c.node === S.compNode ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>`;
+  $("#cn").onchange = e => { S.compNode = +e.target.value; loadComp(); };
+  if (!S.compNode){ $("#stBody").innerHTML = '<div class="empty">Нет разделов с лотами</div>'; return; }
+  $("#stBody").innerHTML = '<div class="loading"><span class="spin"></span> Смотрю витрину FunPay…</div>';
+  let r; try{ r = await call("competitors", S.compNode); }catch(e){ $("#stBody").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  $("#stBody").innerHTML = `<div class="muted" style="margin-bottom:10px;font-size:13px">Предложений в разделе: ${r.total_offers}. Цены — как их видят покупатели (с комиссией FunPay).
+    Сравнение — с предложениями с теми же параметрами раздела и тем же сроком (срок берётся из названия). Место 1 — самый дешёвый.</div>
+    <table><thead><tr><th>Ваш лот</th><th>Срок</th><th class="num">Ваша цена</th><th class="num">Место</th><th class="num">Мин.</th><th class="num">Медиана</th><th></th></tr></thead><tbody>${
+    r.rows.map((x, i) => `<tr><td class="title"><div class="t">${esc(x.title)}</div><div class="sub">${x.visible ? "#" + x.id : (x.active === false ? "выключен — нет на витрине" : "нет на витрине")}</div></td>
+      <td>${fmtDur(x.minutes)}</td>
+      <td class="amt">${x.my_price != null ? x.my_price + " " + esc(x.unit) : `<span class="muted">${esc(x.seller_price || "")} ${esc(x.unit)} без ком.</span>`}</td>
+      <td class="num">${x.rank ? `<span class="${x.rank <= 3 ? "rank-good" : x.rank > x.rivals / 2 ? "rank-bad" : ""}">${x.rank}</span> из ${x.rivals + 1}` : "—"}</td>
+      <td class="num">${x.min ?? "—"}</td><td class="num">${x.median ?? "—"}</td>
+      <td>${x.cheapest && x.cheapest.length ? `<button class="ghost" data-i="${i}">Дешевле всех ▾</button>` : ""}</td></tr>
+      <tr class="hidden" id="cx${i}"><td colspan="7"><div class="muted" style="font-size:12.5px">${(x.cheapest || []).map(o =>
+        `<div>${o.price} ${esc(o.unit)} · ${esc(o.seller || "продавец")} ${o.online ? "🟢" : ""} — <a class="lnk" data-off="${o.id}">${esc(o.title.slice(0, 90))}</a></div>`).join("")}</div></td></tr>`).join("")}</tbody></table>`;
+  $$("#stBody [data-i]").forEach(b => b.onclick = () => $("#cx" + b.dataset.i).classList.toggle("hidden"));
+  $$("#stBody [data-off]").forEach(a => a.onclick = () => call("open_url", `https://funpay.com/lots/offer?id=${a.dataset.off}`));
+}
 
 /* ---------- старт ---------- */
 async function boot(){
   try{
     const st = await call("state");
     S.skipped = st.skipped;
+    S.settings = st.settings || {}; S.tray = st.tray; S.platform = st.platform;
+    applyTheme(S.settings.theme);
     $("#verBtn").textContent = "v" + st.version;
+    setInterval(pollEvents, 5000);
     setTimeout(() => checkUpdate(false), 1500);
     if (st.has_key){ $("#login").classList.add("hidden"); await doLogin(null, true); }
     else showLogin();

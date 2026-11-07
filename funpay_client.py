@@ -53,6 +53,7 @@ class FunPayClient:
         self.s.cookies.set("golden_key", golden_key, domain="funpay.com")
         self.account: Account | None = None
         self._games: list[dict] | None = None
+        self.node_games: dict[int, int] = {}  # раздел -> игра (нужно для поднятия)
 
     # ---------- низкоуровневое ----------
     def _get(self, path: str, **kw) -> requests.Response:
@@ -159,6 +160,9 @@ class FunPayClient:
         bs = BeautifulSoup(r.text, "html.parser")
         if not bs.select_one('a[href*="offerEdit"]'):
             raise FunPayError(f"Раздел {node} не найден или недоступен для продажи.")
+        raise_btn = bs.select_one(".js-lot-raise[data-game]")
+        if raise_btn:
+            self.node_games[node] = int(raise_btn["data-game"])
         # Заголовок страницы — «Ваши предложения»; название раздела берём из ссылки «Назад»/хлебных крошек.
         name = ""
         back = bs.select_one(f'a[href$="/lots/{node}/"]')
@@ -376,3 +380,326 @@ class FunPayClient:
 
     def set_active(self, node: int, offer: int, active: bool) -> dict:
         return self._modify(node, offer, {"active": bool(active)})
+
+    def bulk_edit(self, node: int, offer: int, replace: list | None = None, price: dict | None = None) -> dict:
+        """Массовая правка одного лота: замены текста в описаниях и/или изменение цены.
+        replace: [{"find": str, "to": str}], price: {"mode": "set"|"percent"|"add", "value": float}.
+        Возвращает {"changed": bool, "price": новая цена}."""
+        form = self.get_form(node, offer)
+        changed = False
+        text_fields = {f"fields[{k}][{l}]" for k in ("summary", "desc", "payment_msg") for l in ("ru", "en")}
+        for f in form["fields"]:
+            if replace and f["name"] in text_fields and f.get("value"):
+                v = f["value"]
+                for r in replace:
+                    if r.get("find"):
+                        v = v.replace(r["find"], r.get("to", ""))
+                if v != f["value"]:
+                    f["value"], changed = v, True
+            if price and f["name"] == "price":
+                try:
+                    cur = float(str(f["value"]).replace(",", ".") or 0)
+                    val = float(price["value"])
+                except (TypeError, ValueError):
+                    raise FunPayError("Неверное значение цены.")
+                new = {"set": val, "percent": cur * (1 + val / 100), "add": cur + val}.get(price.get("mode"), cur)
+                new = round(max(new, 0), 2)
+                if new <= 0:
+                    raise FunPayError(f"Цена лота #{offer} получилась бы нулевой или отрицательной — лот пропущен.")
+                if new != cur:
+                    f["value"], changed = (f"{new:.2f}".rstrip("0").rstrip(".")), True
+        if changed:
+            self.save(form["fields"])
+        p = next((f["value"] for f in form["fields"] if f["name"] == "price"), "")
+        return {"changed": changed, "price": p}
+
+    # ---------- поднятие ----------
+    def raise_lots(self, node: int, all_nodes: list[int] | None = None) -> dict:
+        """Поднимает лоты игры, к которой относится раздел node (вместе с остальными вашими разделами этой игры).
+        Возвращает {"ok": True, "msg"} или {"ok": False, "msg", "wait": секунды до следующей попытки}."""
+        self._need_login()
+        game = self.node_games.get(node)
+        if game is None:
+            self.category_lots(node)
+            game = self.node_games.get(node)
+        if game is None:
+            raise FunPayError(f"В разделе {node} нет кнопки поднятия.")
+        nodes = sorted({node, *[n for n in (all_nodes or []) if self.node_games.get(n) == game]})
+        data = [("game_id", str(game)), ("node_id", str(node))] + [("node_ids[]", str(n)) for n in nodes]
+        try:
+            r = self.s.post(f"{BASE}/lots/raise", data=data, timeout=TIMEOUT,
+                            headers={"accept": "*/*", "x-requested-with": "XMLHttpRequest", "origin": BASE,
+                                     "referer": f"{BASE}/lots/{node}/trade"})
+            js = r.json()
+        except (requests.RequestException, ValueError) as e:
+            raise FunPayError(f"Не удалось поднять лоты: {e}") from e
+        msg = re.sub(r"<[^>]+>", " ", str(js.get("msg") or "")).strip()
+        if js.get("modal"):
+            # FunPay спросил, какие разделы поднять, — отвечаем всеми нашими разделами этой игры.
+            mb = BeautifulSoup(js["modal"], "html.parser")
+            ids = [i.get("value") for i in mb.select("input[name='node_ids[]']") if i.get("value")]
+            if ids:
+                data = [("game_id", str(game)), ("node_id", str(node))] + [("node_ids[]", i) for i in ids]
+                js = self.s.post(f"{BASE}/lots/raise", data=data, timeout=TIMEOUT,
+                                 headers={"accept": "*/*", "x-requested-with": "XMLHttpRequest"}).json()
+                msg = re.sub(r"<[^>]+>", " ", str(js.get("msg") or "")).strip()
+        if js.get("error"):
+            return {"ok": False, "msg": msg or "FunPay не поднял лоты", "wait": parse_wait(msg), "game": game}
+        return {"ok": True, "msg": msg or "Предложения подняты", "wait": 0, "game": game}
+
+    # ---------- заказы ----------
+    def orders(self, cont: str = "", state: str = "") -> dict:
+        """Страница продаж (до 100 заказов). state: "" | "paid" | "closed" | "refunded"."""
+        self._need_login()
+        q = f"orders/trade?state={state}" if state else "orders/trade"
+        if cont:
+            try:
+                r = self.s.post(f"{BASE}/{q}", data={"continue": cont, **({"state": state} if state else {})},
+                                timeout=TIMEOUT, headers={"x-requested-with": "XMLHttpRequest"})
+            except requests.RequestException as e:
+                raise FunPayError(f"Нет связи с FunPay: {e}") from e
+            html = r.text
+        else:
+            html = self._get(q).text
+        bs = BeautifulSoup(html, "html.parser")
+        items = []
+        for a in bs.select("a.tc-item"):
+            cls = a.get("class", [])
+            status = "refunded" if "warning" in cls else "paid" if "info" in cls else "closed"
+            price_el = a.select_one(".tc-price")
+            unit = _text(price_el.select_one(".unit")) if price_el else ""
+            buyer = a.select_one(".media-user-name [data-href]")
+            bid = re.search(r"/users/(\d+)/", buyer.get("data-href", "")) if buyer else None
+            date_text = _text(a.select_one(".tc-date-time"))
+            desc = a.select_one(".order-desc")
+            items.append({
+                "id": _text(a.select_one(".tc-order")).lstrip("#"),
+                "date": date_text,
+                "ts": parse_date(date_text),
+                "title": _text(desc.find("div")) if desc else "",
+                "category": _text(a.select_one(".order-desc .text-muted")),
+                "buyer": _text(buyer),
+                "buyer_id": int(bid.group(1)) if bid else 0,
+                "status": status,
+                "status_text": _text(a.select_one(".tc-status")),
+                "amount": _text(price_el).replace(unit, "").strip() if price_el else "",
+                "unit": unit,
+            })
+        nxt = bs.select_one("input[name=continue]")
+        return {"items": items, "next": nxt.get("value", "") if nxt and items else ""}
+
+    def order(self, order_id: str) -> dict:
+        self._need_login()
+        bs = BeautifulSoup(self._get(f"orders/{order_id}/").text, "html.parser")
+        params = []
+        for d in bs.select(".param-item"):
+            h = d.find("h5")
+            if not h:
+                continue
+            name = _text(h)
+            if name == "Действия":
+                continue
+            body = d.find("div")
+            val = body.get_text("\n", strip=True) if body else _text(d).replace(name, "", 1).strip()
+            params.append({"name": name, "value": val})
+        rv = bs.select_one(".order-review")
+        rating = None
+        if rv:
+            stars = rv.select_one(".rating div[class*=rating]")
+            m = re.search(r"rating(\d)", " ".join(stars.get("class", []))) if stars else None
+            rating = int(m.group(1)) if m else None
+        review_text = _text(rv.select_one(".review-compiled-review .review-item-text")) if rv else ""
+        if "Отсутствует" in review_text:
+            review_text = ""
+        reply_el = rv.select_one(".review-compiled-reply > div:not(.review-controls)") if rv else None
+        reply = _text(reply_el)
+        chat = bs.select_one(".chat[data-id]")
+        status = _text(bs.select_one(".page-header .text-success, .page-header .text-warning, .page-header span[class*=text-]"))
+        return {
+            "id": order_id, "params": params, "status": status,
+            "review": {"rating": rating, "text": review_text, "reply": reply,
+                       "can_reply": bool(review_text)},
+            "chat_id": int(chat["data-id"]) if chat else None,
+            "buyer": _text(bs.select_one(".chat-header .media-user-name a")),
+            "can_refund": bool(bs.select_one("button.btn-refund")),
+        }
+
+    def refund(self, order_id: str) -> dict:
+        self._need_login()
+        js = self._xhr("orders/refund", {"id": order_id, "csrf_token": self.account.csrf}).json()
+        if js.get("error"):
+            raise FunPayError(js.get("msg") or "FunPay не оформил возврат.")
+        return {"done": True}
+
+    def review_reply(self, order_id: str, text: str) -> dict:
+        self._need_login()
+        if not (text or "").strip():
+            raise FunPayError("Ответ на отзыв пустой.")
+        try:
+            r = self.s.post(f"{BASE}/orders/review", timeout=TIMEOUT,
+                            data={"authorId": self.account.id, "text": text.strip(), "rating": 5,
+                                  "csrf_token": self.account.csrf, "orderId": order_id},
+                            headers={"accept": "*/*", "x-requested-with": "XMLHttpRequest"})
+            js = r.json()
+        except (requests.RequestException, ValueError) as e:
+            raise FunPayError(f"Не удалось отправить ответ: {e}") from e
+        if r.status_code != 200 or js.get("error"):
+            raise FunPayError(js.get("msg") or f"FunPay не принял ответ ({r.status_code}).")
+        return {"done": True}
+
+    # ---------- чаты ----------
+    def _runner(self, objects: list, request=False) -> dict:
+        self._need_login()
+        payload = {"objects": json.dumps(objects), "request": json.dumps(request) if request else "false",
+                   "csrf_token": self.account.csrf}
+        r = self._xhr("runner/", payload)
+        try:
+            return r.json()
+        except ValueError:
+            raise FunPayError("FunPay вернул неожиданный ответ чата.")
+
+    def chats(self) -> list[dict]:
+        js = self._runner([{"type": "chat_bookmarks", "id": self.account.id, "tag": "00000000", "data": False}])
+        html = next((o["data"]["html"] for o in js.get("objects", []) if o.get("type") == "chat_bookmarks"), "")
+        out = []
+        for a in BeautifulSoup(html, "html.parser").select("a.contact-item"):
+            out.append({
+                "id": int(a["data-id"]),
+                "name": _text(a.select_one(".media-user-name")),
+                "last": _text(a.select_one(".contact-item-message")),
+                "time": _text(a.select_one(".contact-item-time")),
+                "unread": "unread" in a.get("class", []),
+                "msg_id": int(a.get("data-node-msg") or 0),
+            })
+        return out
+
+    def chat_history(self, chat_id: int) -> dict:
+        self._need_login()
+        r = self._get(f"chat/history?node={int(chat_id)}&last_message=999999999999",
+                      headers={"x-requested-with": "XMLHttpRequest", "accept": "*/*"})
+        try:
+            js = r.json()
+        except ValueError:
+            raise FunPayError("Не удалось загрузить чат.")
+        chat = js.get("chat") or {}
+        msgs = []
+        for m in chat.get("messages") or []:
+            bs = BeautifulSoup(m.get("html", ""), "html.parser")
+            text_el = bs.select_one(".chat-msg-text, .message-text")
+            alert = bs.select_one(".alert")
+            img = bs.select_one("a.chat-img-link")
+            text = text_el.get_text("\n", strip=True) if text_el else (alert.get_text(" ", strip=True) if alert else "")
+            author = int(m.get("author") or 0)
+            msgs.append({
+                "id": m.get("id"), "author": author,
+                "mine": author == self.account.id, "system": author == 0,
+                "name": _text(bs.select_one(".media-user-name a, .chat-msg-author-link")) or None,
+                "time": _text(bs.select_one(".chat-msg-date, .message-time")),
+                "text": text, "image": img.get("href") if img else None,
+            })
+        name = (chat.get("node") or {}).get("name", "")
+        return {"id": int(chat_id), "messages": msgs, "node_name": name}
+
+    def send_message(self, chat_id: int, text: str) -> dict:
+        if not (text or "").strip():
+            raise FunPayError("Пустое сообщение.")
+        cid = int(chat_id)
+        objects = [{"type": "chat_node", "id": cid, "tag": "00000000",
+                    "data": {"node": cid, "last_message": -1, "content": ""}}]
+        request = {"action": "chat_message", "data": {"node": cid, "last_message": -1, "content": text.strip()}}
+        js = self._runner(objects, request)
+        resp = js.get("response")
+        if not resp:
+            raise FunPayError("Сообщение не доставлено.")
+        if resp.get("error"):
+            raise FunPayError(f"Сообщение не доставлено: {resp['error']}")
+        return {"done": True}
+
+    # ---------- конкуренты ----------
+    def public_offers(self, node: int, mine_ids: set | None = None) -> dict:
+        """Все предложения раздела на витрине FunPay (как их видят покупатели, цены с комиссией).
+        Свои лоты на витрине идут без data-user, поэтому отмечаются по ID из mine_ids."""
+        mine_ids = mine_ids or set()
+        self._need_login()
+        bs = BeautifulSoup(self._get(f"lots/{int(node)}/").text, "html.parser")
+        offers = []
+        for a in bs.select("a.tc-item"):
+            m = re.search(r"id=(\d+)", a.get("href", ""))
+            price_el = a.select_one(".tc-price")
+            try:
+                price = float(price_el.get("data-s")) if price_el else None
+            except (TypeError, ValueError):
+                price = None
+            if not m or price is None:
+                continue
+            title = _text(a.select_one(".tc-desc-text"))
+            offers.append({
+                "id": int(m.group(1)),
+                "mine": int(m.group(1)) in mine_ids,
+                "user_id": int(a.get("data-user") or 0),
+                "seller": _text(a.select_one(".media-user-name")),
+                "online": a.get("data-online") == "1",
+                "auto": a.get("data-auto") == "1",
+                "promo": "offer-promo" in a.get("class", []),
+                "filters": {k[7:]: v for k, v in a.attrs.items() if k.startswith("data-f-")},
+                "title": title,
+                "minutes": parse_duration(title),
+                "price": round(price, 2),
+                "unit": _text(price_el.select_one(".unit")) if price_el else "",
+                "reviews": _text(a.select_one(".rating-mini-count")),
+            })
+        return {"node": int(node), "offers": offers, "me": self.account.id}
+
+
+MONTHS = {"января": 1, "февраля": 2, "марта": 3, "апреля": 4, "мая": 5, "июня": 6, "июля": 7,
+          "августа": 8, "сентября": 9, "октября": 10, "ноября": 11, "декабря": 12}
+
+
+def parse_date(text: str) -> int:
+    """«сегодня, 11:52» / «вчера, 22:11» / «2 ноября, 10:03» / «12 октября 2025, 10:03» → unix-время (локальное)."""
+    import datetime as dt
+    t = (text or "").strip().lower()
+    now = dt.datetime.now()
+    m = re.search(r"(\d{1,2}):(\d{2})", t)
+    if not m:
+        return 0
+    h, mi = int(m.group(1)), int(m.group(2))
+    try:
+        if t.startswith("сегодня"):
+            d = now.date()
+        elif t.startswith("вчера"):
+            d = (now - dt.timedelta(days=1)).date()
+        else:
+            dm = re.match(r"(\d{1,2})\s+([а-я]+)(?:\s+(\d{4}))?", t)
+            if not dm or dm.group(2) not in MONTHS:
+                return 0
+            year = int(dm.group(3)) if dm.group(3) else now.year
+            d = dt.date(year, MONTHS[dm.group(2)], int(dm.group(1)))
+            if not dm.group(3) and d > now.date():  # «31 декабря» в январе — это прошлый год
+                d = d.replace(year=year - 1)
+        return int(dt.datetime(d.year, d.month, d.day, h, mi).timestamp())
+    except ValueError:
+        return 0
+
+
+def parse_duration(title: str) -> int | None:
+    """Срок аренды из названия: «НА 3 ЧАСА», «на 30 минут», «1 МЕСЯЦ», «24 ч» → минуты. None, если не найдено."""
+    t = (title or "").lower()
+    units = [(r"мес", 30 * 24 * 60), (r"(?:нед|week)", 7 * 24 * 60), (r"(?:дн|день|сут|day)", 24 * 60),
+             (r"(?:час|ч\b|hour|h\b)", 60), (r"(?:мин|min)", 1)]
+    for pat, mult in units:
+        m = re.search(r"(\d+(?:[.,]\d+)?)\s*" + pat, t)
+        if m:
+            return int(float(m.group(1).replace(",", ".")) * mult)
+    return None
+
+
+def parse_wait(msg: str) -> int:
+    """«Подождите 2 часа.» / «Подождите 35 минут.» / «Подождите 1 час 20 минут» → секунды (0, если не распознано)."""
+    t = (msg or "").lower()
+    total = 0
+    for num, unit in re.findall(r"(\d+)\s*(час|мин|сек)", t):
+        total += int(num) * {"час": 3600, "мин": 60, "сек": 1}[unit]
+    if not total and "подожд" in t:
+        total = 3600 if "час" in t else 60 if "минут" in t else 0
+    return total

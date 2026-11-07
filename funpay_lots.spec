@@ -5,13 +5,14 @@
 import platform
 import sys
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 a = Analysis(
     ["app.py"],
     pathex=[],
     datas=[("ui/index.html", "ui"), ("ui/icon.png", "ui")],
-    hiddenimports=["ai", "free_translate"],  # импортируются лениво внутри функций
+    hiddenimports=["ai", "free_translate", "features", "background"]
+    + (["pystray._win32"] if sys.platform == "win32" else []),  # импортируются лениво внутри функций
     excludes=["tkinter"],
     noarchive=False,
 )

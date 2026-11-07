@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import threading
+import time
 import traceback
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
@@ -17,7 +18,7 @@ import updater
 from funpay_client import FunPayClient, FunPayError
 
 APP_NAME = "FunPay Lots"
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 # Для проверки автообновления: FPL_VERSION_OVERRIDE=1.0.0 заставит приложение считать себя старой версией.
 RUNTIME_VERSION = os.environ.get("FPL_VERSION_OVERRIDE") or VERSION
 
@@ -56,7 +57,10 @@ class Store:
             self.data = json.loads(self.path.read_text(encoding="utf-8"))
         except Exception:
             self.data = {}
-        self.data.setdefault("nodes", {})  # node -> name (разделы, где были лоты)
+        # Аккаунты: {id: {golden_key, username, nodes, autoraise, ...}}; "active" — текущий.
+        # До 1.6.0 ключ и разделы лежали в корне — переносим их при первом входе (см. Api.login).
+        self.data.setdefault("accounts", {})
+        self.data.setdefault("templates", [])
 
     def save(self):
         with self.lock:
@@ -83,50 +87,212 @@ def api_call(fn):
     return wrapper
 
 
+SETTINGS_KEYS = {  # простые настройки, которые интерфейс может менять напрямую (ключ -> значение по умолчанию)
+    "theme": "auto", "close_to_background": False, "notify_orders": True, "notify_chats": True,
+    "notify_raise": False, "rental_notify": True, "rental_auto_msg": False, "rental_bonus": 0,
+    "rental_msg": "Здравствуйте, {buyer}! Время аренды по заказу #{order} закончилось. Спасибо за покупку — "
+                  "будем рады отзыву 🙌",
+}
+
+
 class Api:
     def __init__(self):
         self._store = Store()
         self._fp: FunPayClient | None = None
+        self._clients: dict[str, FunPayClient] = {}
         self._window = None
         self._update: dict | None = None
         self._progress = 0.0
+        self._quitting = False
+        self._events: list[dict] = []
+        self._ev_lock = threading.Lock()
+        import background
+        self._notifier = background.Notifier()
+        self._worker = background.Worker(self)
 
+    # ---------- служебное ----------
     def _client(self) -> FunPayClient:
         if not self._fp:
             raise FunPayError("Сначала войдите по ключу.")
         return self._fp
 
-    @api_call
-    def state(self):
-        return {"has_key": bool(self._store.data.get("golden_key")), "version": RUNTIME_VERSION,
-                "skipped": self._store.data.get("skip_version", "")}
+    def _active_uid(self) -> str | None:
+        return self._store.data.get("active")
+
+    def _acc(self) -> dict:
+        uid = self._active_uid()
+        if not uid:
+            raise FunPayError("Сначала войдите по ключу.")
+        return self._store.data["accounts"].setdefault(uid, {})
+
+    def _client_for(self, uid: str) -> FunPayClient | None:
+        """Клиент для фоновых задач любого сохранённого аккаунта (у активного — тот же, что у окна)."""
+        if uid == self._active_uid() and self._fp:
+            return self._fp
+        c = self._clients.get(uid)
+        if c is None:
+            key = (self._store.data["accounts"].get(uid) or {}).get("golden_key")
+            if not key:
+                return None
+            try:
+                c = FunPayClient(key)
+                c.login()
+            except FunPayError:
+                return None
+            self._clients[uid] = c
+        return c
+
+    def notify(self, title: str, text: str):
+        """Уведомление: всплывашка в окне + системное уведомление ОС."""
+        self.push_event("notify", {"title": title, "text": text})
+        self._notifier.os_notify(title, text)
+
+    def push_event(self, kind: str, data: dict):
+        with self._ev_lock:
+            self._events.append({"kind": kind, **data})
+            del self._events[:-50]
 
     @api_call
+    def events(self):
+        """Интерфейс забирает накопившиеся события фоновых задач (раз в несколько секунд)."""
+        with self._ev_lock:
+            ev, self._events = self._events, []
+        return ev
+
+    # ---------- окно и фон ----------
+    def show_window(self):
+        if self._window:
+            self._window.show()
+            try:
+                self._window.restore()
+            except Exception:
+                pass
+
+    def quit_app(self):
+        self._quitting = True
+        self._worker.stop_event.set()
+        if self._notifier.tray is not None:
+            try:
+                self._notifier.tray.stop()
+            except Exception:
+                pass
+        if self._window:
+            self._window.destroy()
+
+    def on_closing(self):
+        """Закрытие окна: если включён фон — прячем окно вместо выхода (False отменяет закрытие)."""
+        if self._quitting or not self._store.data.get("close_to_background"):
+            self._quitting = True
+            if self._notifier.tray is not None:
+                try:
+                    self._notifier.tray.stop()
+                except Exception:
+                    pass
+            return True
+        if self._notifier.tray is not None:  # Windows: прячем в трей
+            self._window.hide()
+            self._notifier.os_notify("FunPay Lots работает в фоне", "Значок — в области уведомлений. Выход — через его меню.")
+        else:  # macOS/Linux: сворачиваем в Dock/панель задач
+            self._window.minimize()
+        return False
+
+    def bg_raise_now(self):
+        for acc in self._store.data["accounts"].values():
+            (acc.get("autoraise") or {}).get("next", {}).clear()
+        self._worker.wake.set()
+
+    # ---------- состояние и настройки ----------
+    @api_call
+    def state(self):
+        s = self._store.data
+        has_key = bool(s.get("golden_key")) or any(a.get("golden_key") for a in s["accounts"].values())
+        return {"has_key": has_key, "version": RUNTIME_VERSION, "skipped": s.get("skip_version", ""),
+                "settings": {k: s.get(k, v) for k, v in SETTINGS_KEYS.items()},
+                "tray": self._notifier.tray is not None, "platform": sys.platform}
+
+    @api_call
+    def set_setting(self, key: str, value):
+        if key not in SETTINGS_KEYS:
+            raise FunPayError("Неизвестная настройка.")
+        default = SETTINGS_KEYS[key]
+        if isinstance(default, bool):
+            value = bool(value)
+        elif isinstance(default, int):
+            value = max(0, min(int(value or 0), 600))
+        else:
+            value = str(value)[:2000]
+        self._store.data[key] = value
+        self._store.save()
+        return value
+
+    # ---------- аккаунты ----------
+    @api_call
     def login(self, key: str | None = None, remember: bool = True):
-        key = key or self._store.data.get("golden_key")
+        s = self._store.data
+        if not key:
+            uid = s.get("active")
+            key = (s["accounts"].get(uid) or {}).get("golden_key") if uid else None
+            key = key or s.get("golden_key") or next((a["golden_key"] for a in s["accounts"].values()
+                                                      if a.get("golden_key")), None)
         if not key:
             raise FunPayError("Введите golden_key.")
         client = FunPayClient(key)
         acc = client.login()
-        self._fp = client
+        uid = str(acc.id)
+        entry = s["accounts"].setdefault(uid, {})
+        entry["username"] = acc.username
         if remember:
-            self._store.data["golden_key"] = key.strip()
+            entry["golden_key"] = key.strip()
         else:
-            self._store.data.pop("golden_key", None)
+            entry.pop("golden_key", None)
+        # Перенос настроек версии до 1.6.0 (один аккаунт в корне файла).
+        if "nodes" in s and not entry.get("nodes"):
+            entry["nodes"] = s.pop("nodes")
+        s.pop("golden_key", None)
+        entry.setdefault("nodes", {})
+        s["active"] = uid
+        self._fp = client
+        self._clients[uid] = client
         self._store.save()
         return {"id": acc.id, "username": acc.username, "balance": acc.balance}
 
     @api_call
+    def accounts(self):
+        s = self._store.data
+        return [{"id": uid, "username": a.get("username", uid), "active": uid == s.get("active"),
+                 "saved": bool(a.get("golden_key")),
+                 "autoraise": bool((a.get("autoraise") or {}).get("enabled"))}
+                for uid, a in s["accounts"].items()]
+
+    @api_call
+    def switch_account(self, uid: str):
+        a = self._store.data["accounts"].get(str(uid))
+        if not a or not a.get("golden_key"):
+            raise FunPayError("Для этого аккаунта не сохранён ключ — войдите заново.")
+        r = self.login(a["golden_key"], True)
+        if not r["ok"]:
+            raise FunPayError(r["error"])
+        return r["data"]
+
+    @api_call
     def logout(self):
+        """Выход из текущего аккаунта: ключ удаляется; если есть другие сохранённые — остаёмся без входа."""
+        s = self._store.data
+        uid = s.get("active")
+        if uid:
+            s["accounts"].pop(uid, None)
+            self._clients.pop(uid, None)
+        s["active"] = next(iter(s["accounts"]), None)
         self._fp = None
-        self._store.data.pop("golden_key", None)
         self._store.save()
-        return True
+        return {"others": len(s["accounts"])}
 
     @api_call
     def lots(self):
         c = self._client()
-        nodes: dict[int, str] = {int(k): v for k, v in self._store.data["nodes"].items()}
+        acc = self._acc()
+        acc.setdefault("nodes", {})
+        nodes: dict[int, str] = {int(k): v for k, v in acc["nodes"].items()}
         for n, name in c.profile_categories().items():
             nodes[n] = name or nodes.get(n, "")
 
@@ -143,8 +309,8 @@ class Api:
         for n, page_name, lots, err in results:
             name = nodes.get(n) or page_name or f"Раздел {n}"
             if not err:
-                self._store.data["nodes"][str(n)] = name
-            cats.append({"node": n, "name": name, "lots": lots, "error": err})
+                acc["nodes"][str(n)] = name
+            cats.append({"node": n, "name": name, "lots": lots, "error": err, "game": c.node_games.get(n)})
         self._store.save()
         cats.sort(key=lambda x: x["name"].lower())
         return cats
@@ -161,8 +327,9 @@ class Api:
     def save(self, node: int, fields: list, category_name: str = ""):
         res = self._client().save(fields)
         key = str(int(node))
-        if category_name or key not in self._store.data["nodes"]:
-            self._store.data["nodes"][key] = category_name or self._store.data["nodes"].get(key) or f"Раздел {node}"
+        nodes = self._acc().setdefault("nodes", {})
+        if category_name or key not in nodes:
+            nodes[key] = category_name or nodes.get(key) or f"Раздел {node}"
             self._store.save()
         return res
 
@@ -176,9 +343,175 @@ class Api:
 
     @api_call
     def forget_category(self, node: int):
-        self._store.data["nodes"].pop(str(int(node)), None)
+        self._acc().setdefault("nodes", {}).pop(str(int(node)), None)
         self._store.save()
         return True
+
+    # ---------- массовые правки ----------
+    @api_call
+    def bulk_edit(self, node: int, offer: int, replace: list | None = None, price: dict | None = None):
+        return self._client().bulk_edit(int(node), int(offer), replace or [], price or None)
+
+    # ---------- автоподнятие ----------
+    @api_call
+    def autoraise_state(self):
+        acc = self._acc()
+        ar = acc.setdefault("autoraise", {})
+        return {"enabled": bool(ar.get("enabled")), "nodes": ar.get("nodes") or [],
+                "next": ar.get("next", {}), "last": ar.get("last", {}),
+                "background": bool(self._store.data.get("close_to_background"))}
+
+    @api_call
+    def autoraise_set(self, enabled: bool, nodes: list | None = None):
+        ar = self._acc().setdefault("autoraise", {})
+        ar["enabled"] = bool(enabled)
+        ar["nodes"] = [int(n) for n in (nodes or [])]
+        if enabled:
+            ar.setdefault("next", {}).clear()  # первая попытка — сразу
+        self._store.save()
+        self._worker.wake.set()
+        return True
+
+    @api_call
+    def raise_now(self, node: int):
+        c = self._client()
+        acc = self._acc()
+        res = c.raise_lots(int(node), [int(n) for n in acc.get("nodes", {})])
+        ar = acc.setdefault("autoraise", {})
+        g = str(res["game"])
+        ar.setdefault("last", {})[g] = {"ts": time.time(), "ok": res["ok"], "msg": res["msg"], "node": int(node),
+                                        "name": acc.get("nodes", {}).get(str(node), f"Раздел {node}")}
+        ar.setdefault("next", {})[g] = time.time() + (res["wait"] or 4 * 3600) + 90
+        self._store.save()
+        return res
+
+    # ---------- шаблоны ----------
+    @api_call
+    def templates(self):
+        return self._store.data["templates"]
+
+    @api_call
+    def template_save(self, name: str, fields: dict):
+        name = (name or "").strip()[:80]
+        if not name:
+            raise FunPayError("Назовите шаблон.")
+        clean = {k: str(v) for k, v in (fields or {}).items() if k.startswith("fields[") and v}
+        if not clean:
+            raise FunPayError("В шаблоне нет текста.")
+        tpls = self._store.data["templates"]
+        tpls[:] = [t for t in tpls if t["name"] != name]
+        tpls.append({"id": str(int(time.time() * 1000)), "name": name, "fields": clean})
+        self._store.save()
+        return tpls
+
+    @api_call
+    def template_delete(self, tid: str):
+        tpls = self._store.data["templates"]
+        tpls[:] = [t for t in tpls if t["id"] != tid]
+        self._store.save()
+        return tpls
+
+    # ---------- бэкап ----------
+    @api_call
+    def backup_lot(self, node: int, offer: int, category: str = ""):
+        import features
+        return features.backup_lot(self._client(), int(node), int(offer), category)
+
+    @api_call
+    def backup_save(self, lots: list):
+        """Сохраняет собранные лоты в файл через системный диалог «Сохранить»."""
+        acc = self._acc()
+        name = f"funpay-lots-{acc.get('username', 'backup')}-{time.strftime('%Y-%m-%d')}.json"
+        path = self._window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name,
+                                               file_types=("Бэкап FunPay Lots (*.json)",))
+        if not path:
+            return None
+        path = path if isinstance(path, str) else path[0]
+        data = {"app": "FunPay Lots", "version": VERSION, "created": time.strftime("%Y-%m-%d %H:%M"),
+                "account": acc.get("username"), "lots": lots}
+        Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        return path
+
+    @api_call
+    def backup_open(self):
+        import features
+        paths = self._window.create_file_dialog(webview.OPEN_DIALOG, file_types=("Бэкап FunPay Lots (*.json)",))
+        if not paths:
+            return None
+        p = paths[0] if isinstance(paths, (list, tuple)) else paths
+        try:
+            data = json.loads(Path(p).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            raise FunPayError("Не удалось прочитать файл.")
+        return {"path": p, "account": data.get("account"), "created": data.get("created"),
+                "lots": features.check_backup(data)}
+
+    @api_call
+    def backup_restore(self, item: dict, inactive: bool = True):
+        import features
+        res = features.restore_lot(self._client(), item, bool(inactive))
+        nodes = self._acc().setdefault("nodes", {})
+        nodes.setdefault(str(int(item["node"])), item.get("category") or f"Раздел {item['node']}")
+        self._store.save()
+        return res
+
+    # ---------- заказы, чаты, аренды ----------
+    @api_call
+    def orders(self, cont: str = "", state: str = ""):
+        return self._client().orders(cont, state)
+
+    @api_call
+    def order(self, order_id: str):
+        return self._client().order(order_id)
+
+    @api_call
+    def refund(self, order_id: str):
+        return self._client().refund(order_id)
+
+    @api_call
+    def review_reply(self, order_id: str, text: str):
+        return self._client().review_reply(order_id, text)
+
+    @api_call
+    def chats(self):
+        return self._client().chats()
+
+    @api_call
+    def chat_history(self, chat_id: int):
+        return self._client().chat_history(int(chat_id))
+
+    @api_call
+    def send_message(self, chat_id: int, text: str):
+        return self._client().send_message(int(chat_id), text)
+
+    @api_call
+    def rentals(self):
+        import features
+        page = self._client().orders()
+        return features.rentals(page["items"], time.time(), int(self._store.data.get("rental_bonus", 0)))
+
+    # ---------- аналитика ----------
+    @api_call
+    def stats(self, days: int = 30):
+        import features
+        return features.stats(self._client(), int(days))
+
+    @api_call
+    def competitors(self, node: int):
+        import features
+        return features.competitors(self._client(), int(node))
+
+    # ---------- ответы с ИИ ----------
+    @api_call
+    def ai_chat_reply(self, chat_id: int, hint: str = ""):
+        h = self._client().chat_history(int(chat_id))
+        return self._ai().reply_chat(h["messages"][-30:], hint)
+
+    @api_call
+    def ai_review_reply(self, order_id: str, hint: str = ""):
+        o = self._client().order(order_id)
+        title = next((p["value"] for p in o["params"] if p["name"] == "Краткое описание"), "")
+        return self._ai().reply_review(o["review"]["text"], o["review"]["rating"], title, hint)
 
     # ---------- финансы ----------
     @api_call
@@ -312,6 +645,10 @@ def selftest() -> int:
         import bs4
         import ai  # noqa: F401
         import free_translate  # noqa: F401
+        import features  # noqa: F401
+        import background  # noqa: F401
+        if sys.platform == "win32":
+            import pystray  # noqa: F401  (значок в трее)
         lines.append(f"anthropic {anthropic.__version__}, bs4 {bs4.__version__}")
         assert resource("ui/index.html").is_file() and resource("ui/icon.png").is_file(), "нет файлов интерфейса"
         if sys.platform == "win32":
@@ -358,10 +695,16 @@ def main():
         APP_NAME, html=page_html(), js_api=api,
         width=1240, height=800, min_size=(900, 600), background_color="#0f1115",
     )
+    api._window.events.closing += api.on_closing
+
+    def on_started():
+        import background
+        api._worker.start()
+        background.start_tray(api, str(resource("ui/icon.png")))
     # Иконку окна pywebview берёт только на Linux (Qt). На Windows параметр ждёт .ico и падает на .png,
     # а иконка там и на macOS и так берётся из exe/.app.
     icon = str(resource("ui/icon.png")) if sys.platform.startswith("linux") else None
-    webview.start(debug=bool(os.environ.get("FPL_DEBUG")), gui=gui_backend(), icon=icon)
+    webview.start(on_started, debug=bool(os.environ.get("FPL_DEBUG")), gui=gui_backend(), icon=icon)
 
 
 def run():
