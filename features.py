@@ -118,9 +118,12 @@ def competitors(client: FunPayClient, node: int) -> dict:
 
 # ---------- аренды ----------
 
-def rentals(orders: list[dict], now: float | None = None, bonus_minutes: int = 0) -> list[dict]:
-    """Активные и недавно закончившиеся аренды по заказам: срок берётся из названия лота («НА 3 ЧАСА»)."""
+def rentals(orders: list[dict], now: float | None = None, bonus_minutes: int = 0,
+            extra: dict | None = None) -> list[dict]:
+    """Активные и недавно закончившиеся аренды по заказам: срок берётся из названия лота («НА 3 ЧАСА»).
+    extra — ручные поправки по заказам {номер заказа: минуты}, прибавляются к сроку (могут быть отрицательными)."""
     now = now or time.time()
+    extra = extra or {}
     out = []
     for o in orders:
         if o["status"] == "refunded" or not o["ts"]:
@@ -128,10 +131,13 @@ def rentals(orders: list[dict], now: float | None = None, bonus_minutes: int = 0
         minutes = parse_duration(o["title"])
         if not minutes or minutes > 60 * 24 * 7:  # месячные подписки — не аренда на часы
             continue
-        end = o["ts"] + (minutes + bonus_minutes) * 60
+        add = int(extra.get(o["id"], 0))
+        total = max(0, minutes + bonus_minutes + add)
+        end = o["ts"] + total * 60
         if end < now - 6 * 3600:
             continue
-        out.append({**o, "minutes": minutes, "end": end, "left": int(end - now), "active": end > now})
+        out.append({**o, "minutes": minutes, "extra": add, "total": total, "end": end,
+                    "left": int(end - now), "active": end > now})
     out.sort(key=lambda r: r["end"])
     return out
 

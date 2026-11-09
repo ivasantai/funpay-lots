@@ -25,6 +25,7 @@
     { name: "active", label: "Активное", kind: "checkbox", locale: "", value: true },
   ]});
   const now = Date.now() / 1000;
+  const rentExtra = {};
   const settings = { theme: "auto", close_to_background: false, notify_orders: true, notify_chats: true, notify_raise: false,
     rental_notify: true, rental_auto_msg: false, rental_bonus: 0, rental_msg: "Здравствуйте, {buyer}! Аренда по заказу #{order} закончилась." };
   const orders = [
@@ -57,7 +58,9 @@
       params: [{ name: "Категория", value: "Аккаунты" }, { name: "Краткое описание", value: "Claude PRO НА 3 ЧАСА" }, { name: "Сумма", value: "5 $" }],
       review: { rating: 4, text: "Всё отлично, быстро выдали", reply: "", can_reply: true } }),
     refund: () => ok({ done: true }), review_reply: () => ok({ done: true }),
-    rentals: () => ok([{ ...orders[0], minutes: 180, end: now + 7200, left: 7200, active: true }, { ...orders[1], minutes: 60, end: now + 300, left: 300, active: true }]),
+    rentals: () => ok([[orders[0], 180, 7200], [orders[1], 60, 300]].map(([o, min, left]) => { const ex = rentExtra[o.id] || 0;
+      return { ...o, minutes: min, extra: ex, total: min + ex, end: now + left + ex * 60, left: left + ex * 60, active: true }; })),
+    rental_adjust: (id, m) => { rentExtra[id] = (rentExtra[id] || 0) + m; return ok(rentExtra[id]); },
     chats: () => ok([{ id: 77, name: "buyer1", last: "есть в наличии что то?", time: "10:12", unread: true, msg_id: 5 }, { id: 78, name: "buyer3", last: "Спасибо!", time: "вчера", unread: false, msg_id: 3 }]),
     chat_history: id => ok({ id, messages: [
       { id: 1, author: 0, mine: false, system: true, name: null, time: "09:00", text: "Покупатель оплатил заказ #ORDER001." },

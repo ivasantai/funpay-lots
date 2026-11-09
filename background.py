@@ -179,7 +179,7 @@ class Worker(threading.Thread):
         done = acc.setdefault("rentals_done", [])
         warned = acc.setdefault("rentals_warned", [])
         now = time.time()
-        for r in features.rentals(items, now, int(s.get("rental_bonus", 0))):
+        for r in features.rentals(items, now, int(s.get("rental_bonus", 0)), acc.get("rentals_extra")):
             if r["active"] and 0 < r["left"] <= 600 and r["id"] not in warned and s.get("rental_notify", True):
                 warned.append(r["id"])
                 api.notify("Аренда скоро закончится", f"#{r['id']} {r['buyer']}: осталось {max(1, r['left'] // 60)} мин")

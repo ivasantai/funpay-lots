@@ -18,7 +18,7 @@ import updater
 from funpay_client import FunPayClient, FunPayError
 
 APP_NAME = "FunPay Lots"
-VERSION = "1.6.0"
+VERSION = "1.6.1"
 # Для проверки автообновления: FPL_VERSION_OVERRIDE=1.0.0 заставит приложение считать себя старой версией.
 RUNTIME_VERSION = os.environ.get("FPL_VERSION_OVERRIDE") or VERSION
 
@@ -488,7 +488,35 @@ class Api:
     def rentals(self):
         import features
         page = self._client().orders()
-        return features.rentals(page["items"], time.time(), int(self._store.data.get("rental_bonus", 0)))
+        return features.rentals(page["items"], time.time(), int(self._store.data.get("rental_bonus", 0)),
+                                self._acc().get("rentals_extra"))
+
+    @api_call
+    def rental_adjust(self, order_id: str, minutes: int):
+        """Добавляет (или убирает, если число отрицательное) минуты к сроку аренды по заказу.
+        Возвращает итоговую ручную поправку в минутах."""
+        order_id = str(order_id).strip().lstrip("#")
+        if not re.fullmatch(r"[A-Za-z0-9]{4,16}", order_id):
+            raise FunPayError("Неверный номер заказа.")
+        try:
+            delta = int(minutes)
+        except (TypeError, ValueError):
+            raise FunPayError("Укажите число минут.")
+        acc = self._acc()
+        extra = acc.setdefault("rentals_extra", {})
+        total = max(-7 * 24 * 60, min(extra.get(order_id, 0) + delta, 30 * 24 * 60))
+        if total:
+            extra[order_id] = total
+        else:
+            extra.pop(order_id, None)
+        # Срок изменился — напоминания «скоро закончится» и «закончилась» должны сработать заново.
+        for key in ("rentals_done", "rentals_warned"):
+            if order_id in acc.get(key, []):
+                acc[key].remove(order_id)
+        for k in list(extra)[:-300]:  # не копим поправки по давно закрытым заказам
+            extra.pop(k, None)
+        self._store.save()
+        return total
 
     # ---------- аналитика ----------
     @api_call
