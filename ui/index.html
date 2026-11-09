@@ -288,7 +288,7 @@ tr.clickable td{cursor:pointer}
       <button id="refreshBtn" title="Ctrl+R">⟳</button>
       <button id="newBtn" class="primary" title="Ctrl+N">＋ Новый лот</button>
     </span>
-    <button id="verBtn" class="ghost ver" title="Проверить обновления"></button>
+    <button id="verBtn" class="ghost ver" title="Проверить, вышла ли новая версия"></button>
     <button id="setBtn" class="ghost" title="Настройки">⚙</button>
   </header>
   <div id="viewFin" class="hidden view"><div class="fin-wrap" id="fin"></div></div>
@@ -979,13 +979,24 @@ function openWithdraw(currency){
 
 /* ---------- обновления ---------- */
 async function checkUpdate(manual=false){
+  if (S.checkingUpdate) return;
+  S.checkingUpdate = true;
+  const vb = $("#verBtn");
+  if (manual){ vb.disabled = true; vb.innerHTML = '<span class="spin"></span> Проверяю…'; }
   try{
     const u = await call("check_update");
+    S.lastCheck = Date.now();
     if (!u.available){ if (manual) toast(`У вас последняя версия (${u.current})`); return; }
-    if (!manual && S.skipped === u.latest) return;
+    if (!manual && S.skipped === u.latest) return;  // ручная проверка показывает и пропущенную версию
     showUpdate(u);
   }catch(e){ if (manual) toast(e.message, true); }
+  finally{
+    S.checkingUpdate = false;
+    vb.disabled = false; vb.textContent = "⟳ v" + S.version;
+    const s = $("#updStatus"); if (s) s.textContent = updStatusText();
+  }
 }
+const updStatusText = () => S.lastCheck ? `Последняя проверка: ${new Date(S.lastCheck).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}` : "";
 function showUpdate(u){
   const box = $("#upd");
   const mb = u.size ? ` · ${(u.size / 1048576).toFixed(1)} МБ` : "";
@@ -1045,6 +1056,11 @@ async function openSettings(section){
       <option value="dark" ${sg.theme === "dark" ? "selected" : ""}>Тёмная</option></select></div>
     ${chk("close_to_background", "Работать в фоне", bgHint + " Нужно, чтобы автоподнятие и уведомления работали при закрытом окне.")}
     <div class="hint" style="margin-bottom:6px">Горячие клавиши: Ctrl/⌘+1…5 — вкладки, Ctrl/⌘+N — новый лот, Ctrl/⌘+F — поиск, Ctrl/⌘+R — обновить, Esc — закрыть окно.</div>
+    <h4 style="margin:14px 0 8px">Обновления</h4>
+    <div class="row" style="margin-bottom:6px"><span>Установлена версия <b>${esc(S.version || "")}</b></span><div class="spacer"></div>
+      <button id="updNow">⟳ Проверить сейчас</button></div>
+    <div class="hint" id="updStatus" style="margin-bottom:6px">${esc(updStatusText())}</div>
+    ${chk("auto_update_check", "Проверять автоматически каждые 30 минут", "Пока приложение запущено, в том числе в фоне. О новой версии придёт уведомление.")}
     <h4 style="margin:14px 0 8px">Уведомления</h4>
     ${chk("notify_orders", "Новые заказы")}${chk("notify_chats", "Новые сообщения в чатах")}${chk("notify_raise", "Каждое успешное автоподнятие")}
     <h4 style="margin:14px 0 8px" id="rentSec">Аренда</h4>
@@ -1089,6 +1105,11 @@ async function openSettings(section){
     }catch(x){ toast(x.message, true); }
   }));
   if (section === "rent") setTimeout(() => $("#rentSec", wrap).scrollIntoView({ block: "start" }), 50);
+  $("#updNow", wrap).onclick = async e => {
+    const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spin"></span> Проверяю…';
+    await checkUpdate(true);
+    b.disabled = false; b.textContent = "⟳ Проверить сейчас";
+  };
   $("#aiShow", wrap).onclick = () => { const k = $("#aiKey", wrap); k.type = k.type === "password" ? "text" : "password"; };
   $("#aiConsole", wrap).onclick = () => call("open_url", "https://console.anthropic.com/settings/keys");
   const del = $("#aiDel", wrap);
@@ -1139,6 +1160,8 @@ async function pollEvents(){
   for (const e of ev){
     if (e.kind === "notify") toast(`${e.title}: ${e.text}`);
     if (e.kind === "autoraise") refreshRaiseChip();
+    if (e.kind === "update" && e.info && S.skipped !== e.info.latest){ S.lastCheck = Date.now(); showUpdate(e.info); }
+    if (e.kind === "check_update") checkUpdate(true);
     if (e.kind === "chats"){ $("#chatDot").classList.remove("hidden"); if (S.view === "chats") loadChats(true); }
     if (e.kind === "orders" && S.view === "orders") loadOrders();
     if (e.kind === "rentals" && S.view === "orders") loadRentals();
@@ -1632,7 +1655,8 @@ async function boot(){
     S.skipped = st.skipped;
     S.settings = st.settings || {}; S.tray = st.tray; S.platform = st.platform;
     applyTheme(S.settings.theme);
-    $("#verBtn").textContent = "v" + st.version;
+    S.version = st.version;
+    $("#verBtn").textContent = "⟳ v" + st.version;
     setInterval(pollEvents, 5000);
     setTimeout(() => checkUpdate(false), 1500);
     if (st.has_key){ $("#login").classList.add("hidden"); await doLogin(null, true); }

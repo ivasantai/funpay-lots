@@ -57,9 +57,14 @@ def start_tray(api, icon_path: str) -> bool:
     def quit_app(icon=None, item=None):
         api.quit_app()
 
+    def check_updates(icon=None, item=None):
+        api.show_window()
+        api.push_event("check_update", {})  # окно само проверит и покажет результат
+
     menu = pystray.Menu(
         pystray.MenuItem("Открыть FunPay Lots", show, default=True),
         pystray.MenuItem("Поднять лоты сейчас", raise_now),
+        pystray.MenuItem("Проверить обновления", check_updates),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Выход", quit_app),
     )
@@ -83,6 +88,8 @@ class Worker(threading.Thread):
         self.stop_event = threading.Event()
         self.last_orders_check = 0.0
         self.last_chats_check = 0.0
+        self.last_update_check = time.time()  # первую проверку при запуске делает окно
+        self.notified_version = ""
         self.seen_orders: dict[str, set] = {}
         self.seen_msgs: dict[str, dict] = {}
         self.wake = threading.Event()
@@ -96,9 +103,30 @@ class Worker(threading.Thread):
             self.wake.wait(self.TICK)
             self.wake.clear()
 
+    UPDATE_EVERY = 30 * 60
+
+    def check_update(self, now: float):
+        """Раз в 30 минут спрашивает GitHub о новой версии; о каждой новой версии сообщает один раз."""
+        s = self.api._store.data
+        if not s.get("auto_update_check", True) or now - self.last_update_check < self.UPDATE_EVERY:
+            return
+        self.last_update_check = now
+        import updater
+        try:
+            info = self.api.find_update()
+        except updater.UpdateError as e:
+            log.info("update check failed: %s", e)
+            return
+        latest = info.get("latest")
+        if info.get("available") and latest != s.get("skip_version") and latest != self.notified_version:
+            self.notified_version = latest
+            self.api.push_event("update", {"info": info})
+            self.api._notifier.os_notify(f"Доступна FunPay Lots {latest}", "Откройте приложение и нажмите «Обновить».")
+
     def step(self):
         api = self.api
         now = time.time()
+        self.check_update(now)
         for uid, acc in list(api._store.data.get("accounts", {}).items()):
             ar = acc.get("autoraise") or {}
             if ar.get("enabled"):

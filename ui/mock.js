@@ -26,7 +26,7 @@
   ]});
   const now = Date.now() / 1000;
   const rentExtra = {};
-  const settings = { theme: "auto", close_to_background: false, notify_orders: true, notify_chats: true, notify_raise: false,
+  const settings = { auto_update_check: true, theme: "auto", close_to_background: false, notify_orders: true, notify_chats: true, notify_raise: false,
     rental_notify: true, rental_auto_msg: false, rental_bonus: 0, rental_msg: "Здравствуйте, {buyer}! Аренда по заказу #{order} закончилась." };
   const orders = [
     { id: "ORDER001", date: "сегодня, 11:52", ts: now - 3600, title: "ChatGPT Plus — аренда НА 3 ЧАСА, С подпиской, Plus", category: "ChatGPT, Аккаунты", buyer: "buyer1", buyer_id: 1, status: "closed", status_text: "Закрыт", amount: "5.00", unit: "$" },

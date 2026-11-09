@@ -18,7 +18,7 @@ import updater
 from funpay_client import FunPayClient, FunPayError
 
 APP_NAME = "FunPay Lots"
-VERSION = "1.6.1"
+VERSION = "1.6.2"
 # Для проверки автообновления: FPL_VERSION_OVERRIDE=1.0.0 заставит приложение считать себя старой версией.
 RUNTIME_VERSION = os.environ.get("FPL_VERSION_OVERRIDE") or VERSION
 
@@ -89,7 +89,7 @@ def api_call(fn):
 
 SETTINGS_KEYS = {  # простые настройки, которые интерфейс может менять напрямую (ключ -> значение по умолчанию)
     "theme": "auto", "close_to_background": False, "notify_orders": True, "notify_chats": True,
-    "notify_raise": False, "rental_notify": True, "rental_auto_msg": False, "rental_bonus": 0,
+    "notify_raise": False, "auto_update_check": True, "rental_notify": True, "rental_auto_msg": False, "rental_bonus": 0,
     "rental_msg": "Здравствуйте, {buyer}! Время аренды по заказу #{order} закончилось. Спасибо за покупку — "
                   "будем рады отзыву 🙌",
 }
@@ -622,7 +622,12 @@ class Api:
     # ---------- обновления ----------
     @api_call
     def check_update(self):
+        return self.find_update()
+
+    def find_update(self) -> dict:
+        """Спрашивает GitHub о последней версии (вызывают и окно, и фоновая проверка)."""
         self._update = updater.check(RUNTIME_VERSION)
+        self._update["checked_at"] = time.time()
         return self._update
 
     @api_call
