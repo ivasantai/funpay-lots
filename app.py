@@ -14,11 +14,12 @@ from pathlib import Path
 
 import webview
 
+import i18n
 import updater
 from funpay_client import FunPayClient, FunPayError
 
 APP_NAME = "FunPay Lots"
-VERSION = "1.6.2"
+VERSION = "1.7.0"
 # Для проверки автообновления: FPL_VERSION_OVERRIDE=1.0.0 заставит приложение считать себя старой версией.
 RUNTIME_VERSION = os.environ.get("FPL_VERSION_OVERRIDE") or VERSION
 
@@ -35,7 +36,10 @@ def page_html() -> str:
     import base64
     html = resource("ui/index.html").read_text(encoding="utf-8")
     icon = "data:image/png;base64," + base64.b64encode(resource("ui/icon.png").read_bytes()).decode()
-    return html.replace('src="icon.png"', f'src="{icon}"').replace('href="icon.png"', f'href="{icon}"')
+    html = html.replace('src="icon.png"', f'src="{icon}"').replace('href="icon.png"', f'href="{icon}"')
+    # Словарь английского встраивается в страницу (в обычном браузере index.html грузит его сам).
+    dict_json = resource("ui/i18n_en.json").read_text(encoding="utf-8").replace("</", "<\\/")
+    return html.replace("/*I18N_EN*/", f"window.I18N_EN = {dict_json};", 1)
 
 
 def config_dir() -> Path:
@@ -54,7 +58,8 @@ class Store:
         self.path = config_dir() / "config.json"
         self.lock = threading.Lock()
         try:
-            self.data = json.loads(self.path.read_text(encoding="utf-8"))
+            # utf-8-sig: файл, сохранённый Блокнотом/PowerShell, может начинаться с BOM
+            self.data = json.loads(self.path.read_text(encoding="utf-8-sig"))
         except Exception:
             self.data = {}
         # Аккаунты: {id: {golden_key, username, nodes, autoraise, ...}}; "active" — текущий.
@@ -74,21 +79,22 @@ class Store:
 def api_call(fn):
     """Оборачивает метод API: ответ всегда {ok, data} или {ok:false, error}."""
     def wrapper(self, *a, **kw):
+        lang = getattr(self, "_lang", "ru")  # ошибки возвращаются на языке интерфейса
         try:
             return {"ok": True, "data": fn(self, *a, **kw)}
         except (FunPayError, updater.UpdateError) as e:
-            return {"ok": False, "error": str(e)}
+            return {"ok": False, "error": i18n.tr(str(e), lang)}
         except Exception as e:  # noqa: BLE001
             if type(e).__name__ in ("AIError", "FreeTranslateError"):  # модули грузятся лениво
-                return {"ok": False, "error": str(e)}
+                return {"ok": False, "error": i18n.tr(str(e), lang)}
             traceback.print_exc()
-            return {"ok": False, "error": f"Внутренняя ошибка: {e}"}
+            return {"ok": False, "error": i18n.tr(f"Внутренняя ошибка: {e}", lang)}
     wrapper.__name__ = fn.__name__
     return wrapper
 
 
 SETTINGS_KEYS = {  # простые настройки, которые интерфейс может менять напрямую (ключ -> значение по умолчанию)
-    "theme": "auto", "close_to_background": False, "notify_orders": True, "notify_chats": True,
+    "lang": "auto", "theme": "auto", "close_to_background": False, "notify_orders": True, "notify_chats": True,
     "notify_raise": False, "auto_update_check": True, "rental_notify": True, "rental_auto_msg": False, "rental_bonus": 0,
     "rental_msg": "Здравствуйте, {buyer}! Время аренды по заказу #{order} закончилось. Спасибо за покупку — "
                   "будем рады отзыву 🙌",
@@ -106,9 +112,18 @@ class Api:
         self._quitting = False
         self._events: list[dict] = []
         self._ev_lock = threading.Lock()
+        # Язык сообщений Python-части. «auto» уточняет окно (по языку системы) через set_ui_lang().
+        self._lang = self._store.data.get("lang") if self._store.data.get("lang") in ("ru", "en") else "ru"
         import background
         self._notifier = background.Notifier()
+        self._notifier.translate = lambda s: i18n.tr(s, self._lang)
         self._worker = background.Worker(self)
+
+    @api_call
+    def set_ui_lang(self, lang: str):
+        """Окно сообщает итоговый язык интерфейса (после разбора «auto»)."""
+        self._lang = "en" if lang == "en" else "ru"
+        return self._lang
 
     # ---------- служебное ----------
     def _client(self) -> FunPayClient:
@@ -144,8 +159,8 @@ class Api:
 
     def notify(self, title: str, text: str):
         """Уведомление: всплывашка в окне + системное уведомление ОС."""
-        self.push_event("notify", {"title": title, "text": text})
-        self._notifier.os_notify(title, text)
+        self.push_event("notify", {"title": i18n.tr(title, self._lang), "text": i18n.tr(text, self._lang)})
+        self._notifier.os_notify(title, text)  # Notifier переводит сам
 
     def push_event(self, kind: str, data: dict):
         with self._ev_lock:
@@ -684,6 +699,8 @@ def selftest() -> int:
             import pystray  # noqa: F401  (значок в трее)
         lines.append(f"anthropic {anthropic.__version__}, bs4 {bs4.__version__}")
         assert resource("ui/index.html").is_file() and resource("ui/icon.png").is_file(), "нет файлов интерфейса"
+        assert i18n.tr("Сохранить", "en") == "Save", "нет словаря английского"
+        assert "window.I18N_EN = {" in page_html(), "словарь не встроен в страницу"
         if sys.platform == "win32":
             import webview.platforms.winforms  # noqa: F401  (тянет pythonnet и WebView2)
         elif sys.platform == "darwin":

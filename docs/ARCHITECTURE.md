@@ -1,231 +1,261 @@
-# Устройство проекта
+# Architecture
 
-## Стек
-- **Python 3.12+** — логика и работа с FunPay (`requests` + `BeautifulSoup`).
-- **pywebview** — нативное окно с веб-интерфейсом: Edge WebView2 на Windows, WebKit на macOS, Qt WebEngine на Linux.
-- **HTML/CSS/JS без фреймворков** — весь интерфейс в одном файле `ui/index.html`.
-- **PyInstaller** — упаковка в `.exe` / `.app`; **GitHub Actions** — сборка под обе ОС.
+**English** · [Русский](ARCHITECTURE.ru.md)
 
-## Файлы
+## Stack
+- **Python 3.12+** — logic and FunPay access (`requests` + `BeautifulSoup`).
+- **pywebview** — a native window with a web interface: Edge WebView2 on Windows, WebKit on macOS, Qt WebEngine on Linux.
+- **Plain HTML/CSS/JS, no frameworks** — the whole interface is one file, `ui/index.html`.
+- **PyInstaller** — packaging into `.exe` / `.app`; **GitHub Actions** — builds for every OS.
 
-```
-app.py               окно, мост JS ↔ Python (класс Api), хранение настроек
-funpay_client.py     клиент FunPay: вход, лоты, финансы и вывод
-updater.py           проверка и установка обновлений из GitHub Releases
-ai.py                нейросеть (Claude API): генерация описания и перевод на английский
-free_translate.py    бесплатный перевод RU→EN через MyMemory (без ключа)
-features.py          статистика продаж, цены конкурентов, аренды, бэкап/восстановление лотов
-background.py        фоновый поток (автоподнятие, новые заказы/сообщения, аренды), уведомления ОС, трей
-ui/index.html        интерфейс (вход, список, редактор, выбор раздела)
-ui/mock.js           фейковое API для просмотра интерфейса в браузере (?mock)
-ui/icon.png          логотип в интерфейсе
-assets/              исходник иконки и сгенерированные icon.ico / icon.icns / icon.png
-tools/make_icons.py  генерация иконок из assets/icon-source.*
-funpay_lots.spec     конфигурация PyInstaller для Windows и macOS
-.github/workflows/build.yml   сборка и релиз в GitHub Actions
-```
-
-## Поток данных
+## Files
 
 ```
-ui/index.html ──window.pywebview.api.<метод>()──▶ Api (app.py) ──▶ FunPayClient ──HTTPS──▶ funpay.com
+app.py               window, JS ↔ Python bridge (the Api class), settings storage
+funpay_client.py     FunPay client: sign-in, lots, finances and withdrawals
+updater.py           checking for and installing updates from GitHub Releases
+ai.py                AI (Claude API): description generation and translation into English
+free_translate.py    free RU→EN translation via MyMemory (no key)
+features.py          sales statistics, competitor prices, rentals, lot backup/restore
+background.py        background thread (auto-raise, new orders/messages, rentals), OS notifications, tray
+i18n.py              translation of Python-side messages into English (same dictionary as the interface)
+ui/index.html        interface (sign-in, lists, editor, category picker, …)
+ui/i18n_en.json      ru→en dictionary (built by tools/i18n_build.py)
+ui/i18n_audit.js     translation check in a browser (?mock, then i18nAudit()) — not part of the app
+ui/mock.js           fake API for viewing the interface in a browser (?mock)
+ui/icon.png          logo in the interface
+assets/              icon source and the generated icon.ico / icon.icns / icon.png
+tools/make_icons.py  icon generation from assets/icon-source.*
+tools/i18n_build.py  interface translation dictionary (source of ui/i18n_en.json)
+funpay_lots.spec     PyInstaller configuration for Windows, macOS and Linux
+.github/workflows/build.yml   builds and releases in GitHub Actions
+```
+
+## Data flow
+
+```
+ui/index.html ──window.pywebview.api.<method>()──▶ Api (app.py) ──▶ FunPayClient ──HTTPS──▶ funpay.com
        ◀──────────── {ok: true, data} | {ok: false, error} ◀────────────┘
 ```
 
-Каждый метод `Api` обёрнут в `api_call`: исключения не уходят в JS, а превращаются в
-`{ok: false, error: "<текст для пользователя>"}`. Ошибки FunPay (`FunPayError`) показываются как есть,
-остальные — как «Внутренняя ошибка» (трассировка печатается в консоль).
+Every `Api` method is wrapped in `api_call`: exceptions never reach JS; they become
+`{ok: false, error: "<text for the user>"}`. FunPay errors (`FunPayError`) are shown as they are (translated
+into the interface language), everything else as “Internal error” (the traceback is printed to the console).
 
-pywebview вызывает методы `Api` в отдельных потоках, поэтому долгие запросы не замораживают окно.
+pywebview calls `Api` methods in separate threads, so long requests don't freeze the window.
 
-### Методы Api
+### Api methods
 
-| Метод | Что делает |
+| Method | What it does |
 |---|---|
-| `state()` | есть ли сохранённый ключ, версия, настройки, есть ли трей |
-| `set_setting(key, value)` | тема, фон, уведомления, параметры аренды |
-| `accounts()` / `switch_account(id)` | список аккаунтов / переключение |
-| `events()` | события фона для окна (уведомления, обновления) |
-| `bulk_edit(node, offer, replace, price)` | замена текста и/или изменение цены одного лота |
-| `autoraise_state()` / `autoraise_set(enabled, nodes)` / `raise_now(node)` | автоподнятие |
-| `templates()` / `template_save(name, fields)` / `template_delete(id)` | шаблоны описаний |
-| `backup_lot(...)` / `backup_save(lots)` / `backup_open()` / `backup_restore(item, inactive)` | бэкап и восстановление |
-| `orders(cont, state)` / `order(id)` / `refund(id)` / `review_reply(id, text)` / `rentals()` | заказы и аренды |
-| `chats()` / `chat_history(id)` / `send_message(id, text)` | чаты |
-| `stats(days)` / `competitors(node)` | аналитика |
-| `ai_chat_reply(chat_id, hint)` / `ai_review_reply(order_id, hint)` | черновики ответов нейросетью |
-| `login(key, remember)` | вход; без `key` — по сохранённому ключу |
-| `logout()` | забыть ключ |
-| `lots()` | все разделы и лоты (см. ниже) |
-| `games()` | каталог игр/разделов FunPay для выбора при создании |
-| `form(node, offer)` | форма лота: существующего (`offer`) или нового (`offer=None`) |
-| `save(node, fields, category_name)` | отправить форму; запоминает раздел |
-| `delete(node, offer)` / `set_active(node, offer, active)` | удаление / вкл-выкл |
-| `forget_category(node)` | убрать раздел из запомненных |
-| `finance()` | балансы, способы вывода, сохранённые реквизиты, банки СБП, фильтры истории |
-| `transactions(filter, cont)` | страница истории операций; `cont` — курсор следующей страницы |
-| `withdraw_calc(...)` | сумма к получению с учётом комиссии |
-| `withdraw_preview(...)` / `withdraw_confirm(..., twofactor)` | два шага вывода (см. ниже) |
-| `check_update()` / `install_update()` / `update_progress()` / `skip_update(v)` | автообновление |
-| `ai_status()` / `ai_set_key(key)` | есть ли ключ нейросети / проверить и сохранить ключ (пустой — удалить) |
-| `ai_generate(brief, category, attributes, current, with_payment_msg, with_english)` | сгенерировать поля лота |
-| `ai_translate(fields)` | перевести `summary`/`desc`/`payment_msg` на английский; в ответе `engine`: `claude` или `free` |
-| `set_translator(mode, email)` | режим перевода `auto`/`free`/`claude` и почта для лимита MyMemory |
-| `open_url(url)` | открыть в браузере (только `https://funpay.com/…` и страницы этого репозитория) |
+| `state()` | whether a key is saved, version, settings, whether there's a tray |
+| `set_ui_lang(lang)` | interface language for Python-side messages (`ru` / `en`) |
+| `set_setting(key, value)` | language, theme, background mode, notifications, rental options |
+| `accounts()` / `switch_account(id)` | list of accounts / switching |
+| `events()` | background events for the window (notifications, updates) |
+| `bulk_edit(node, offer, replace, price)` | text replacement and/or price change for one lot |
+| `autoraise_state()` / `autoraise_set(enabled, nodes)` / `raise_now(node)` | auto-raise |
+| `templates()` / `template_save(name, fields)` / `template_delete(id)` | description templates |
+| `backup_lot(...)` / `backup_save(lots)` / `backup_open()` / `backup_restore(item, inactive)` | backup and restore |
+| `orders(cont, state)` / `order(id)` / `refund(id)` / `review_reply(id, text)` / `rentals()` / `rental_adjust(id, minutes)` | orders and rentals |
+| `chats()` / `chat_history(id)` / `send_message(id, text)` | chats |
+| `stats(days)` / `competitors(node)` | analytics |
+| `ai_chat_reply(chat_id, hint)` / `ai_review_reply(order_id, hint)` | AI reply drafts |
+| `login(key, remember)` | sign in; without `key` — with the saved key |
+| `logout()` | forget the current account's key |
+| `lots()` | all categories and lots (see below) |
+| `games()` | the FunPay game/category catalog for picking when creating a lot |
+| `form(node, offer)` | lot form: an existing one (`offer`) or a new one (`offer=None`) |
+| `save(node, fields, category_name)` | submit the form; remembers the category |
+| `delete(node, offer)` / `set_active(node, offer, active)` | delete / enable-disable |
+| `forget_category(node)` | remove a category from the remembered ones |
+| `finance()` | balances, withdrawal methods, saved details, SBP banks, history filters |
+| `transactions(filter, cont)` | a page of the transaction history; `cont` — cursor of the next page |
+| `withdraw_calc(...)` | amount you receive after fees |
+| `withdraw_preview(...)` / `withdraw_confirm(..., twofactor)` | the two withdrawal steps (see below) |
+| `check_update()` / `install_update()` / `update_progress()` / `skip_update(v)` | auto-update |
+| `ai_status()` / `ai_set_key(key)` | whether there's an AI key / check and save the key (empty — delete) |
+| `ai_generate(brief, category, attributes, current, with_payment_msg, with_english)` | generate lot fields |
+| `ai_translate(fields)` | translate `summary`/`desc`/`payment_msg` into English; `engine` in the response: `claude` or `free` |
+| `set_translator(mode, email)` | translation mode `auto`/`free`/`claude` and an email for the MyMemory limit |
+| `open_url(url)` | open in the browser (only `https://funpay.com/…`, this repository and the Anthropic console) |
 
-Публичные атрибуты объекта `Api` pywebview тоже пробрасывает в JS, поэтому внутреннее состояние
-хранится в полях с подчёркиванием (`_fp`, `_store`, `_window`).
+pywebview also exposes public attributes of the `Api` object to JS, so internal state is kept in fields with an
+underscore (`_fp`, `_store`, `_window`).
 
-## Как работает клиент FunPay
+## How the FunPay client works
 
-Официального API нет — клиент повторяет запросы, которые делает сайт.
+There's no official API — the client repeats the requests the website makes.
 
-| Действие | Запрос |
+| Action | Request |
 |---|---|
-| Авторизация | cookie `golden_key` в `requests.Session`. Сессия сама сохраняет выданные сайтом cookie (`PHPSESSID`, `golden_seal` и т. д.) |
-| Кто я | `GET /` → JSON в атрибуте `<body data-app-data>`: `userId`, `csrf-token`; ник — `.user-link-name`, баланс — `.badge-balance` |
-| Каталог разделов | `GET /` → `.promo-game-item` → ссылки `/lots/<node>/` |
-| Разделы с лотами | `GET /users/<id>/` → `.offer-list-title` (только разделы с **активными** лотами) |
-| Свои лоты раздела | `GET /lots/<node>/trade` → `a.tc-item` (`data-offer`, `.tc-desc-text`, `.tc-amount`, `.tc-price[data-s]`). Неактивные лоты имеют класс `warning` |
-| Форма лота | `GET /lots/offerEdit?node=<node>[&offer=<id>]` → `form[action*=offerSave]` |
-| Сохранить / создать | `POST /lots/offerSave` (`x-requested-with: XMLHttpRequest`) со всеми полями формы. Новый лот — `offer_id=0` |
-| Удалить | то же сохранение с `deleted=1` |
-| Вкл/выкл | то же сохранение с `active=on` или без поля `active` |
+| Authorization | the `golden_key` cookie in a `requests.Session`. The session keeps the cookies the site hands out (`PHPSESSID`, `golden_seal`, etc.) |
+| Who am I | `GET /` → JSON in `<body data-app-data>`: `userId`, `csrf-token`; nickname — `.user-link-name`, balance — `.badge-balance` |
+| Category catalog | `GET /` → `.promo-game-item` → links `/lots/<node>/` |
+| Categories with lots | `GET /users/<id>/` → `.offer-list-title` (only categories with **active** lots) |
+| Own lots of a category | `GET /lots/<node>/trade` → `a.tc-item` (`data-offer`, `.tc-desc-text`, `.tc-amount`, `.tc-price`). Inactive lots have the `warning` class |
+| Lot form | `GET /lots/offerEdit?node=<node>[&offer=<id>]` → `form[action*=offerSave]` |
+| Save / create | `POST /lots/offerSave` (`x-requested-with: XMLHttpRequest`) with all form fields. A new lot has `offer_id=0` |
+| Delete | the same save with `deleted=1` |
+| Enable/disable | the same save with `active=on` or without the `active` field |
 
-Ответ `offerSave` — JSON: `{"done": true, "error": false, "errors": [], "url": …}` или
-`{"error": "…", "errors": [["price", "Укажите цену."], …]}`. Клиент подставляет вместо имён полей
-их подписи из формы: «Цена за 1 шт.: Укажите цену».
+The `offerSave` response is JSON: `{"done": true, "error": false, "errors": [], "url": …}` or
+`{"error": "…", "errors": [["price", "Укажите цену."], …]}`. The client replaces field names with their labels
+from the form: “Цена за 1 шт.: Укажите цену” (then translated: “Price per unit: Specify the price”).
 
-### Поднятие, заказы, чаты, витрина
+### Raising, orders, chats, storefront
 
-| Действие | Запрос |
+| Action | Request |
 |---|---|
-| ID игры раздела | `GET /lots/<node>/trade` → кнопка `.js-lot-raise[data-game][data-node]` |
-| Поднять | `POST /lots/raise` (`game_id`, `node_id`, `node_ids[]` — все ваши разделы этой игры). Ответ `{"error": false, "msg": …}` или `{"error": true, "msg": "Подождите 2 часа."}` (срок разбирает `parse_wait`; «час» без числа = 1 час). Если пришёл `modal` с выбором разделов — повтор со всеми `node_ids[]` из него |
-| Продажи | `GET /orders/trade[?state=paid|closed|refunded]`, следующая страница — `POST` с `continue`. `a.tc-item`: класс `info` — ожидает, `warning` — возврат, иначе закрыт; `.tc-order`, `.tc-date-time`, `.order-desc`, `.media-user-name`, `.tc-price` |
-| Заказ | `GET /orders/<id>/` → `.param-item` (h5 + значение), `.order-review` (рейтинг `rating<N>`, текст, `.review-compiled-reply`), `.chat[data-id]` — ID чата, `button.btn-refund` — можно вернуть |
-| Возврат | `POST /orders/refund` (`id`, `csrf_token`) |
-| Ответ на отзыв | `POST /orders/review` (`authorId` = свой ID, `text`, `rating`, `orderId`, `csrf_token`) |
-| Список чатов | `POST /runner/` с объектом `chat_bookmarks` → `a.contact-item` (`data-id`, `data-node-msg`, класс `unread`) |
-| История чата | `GET /chat/history?node=<id>&last_message=…` → `chat.messages[]` (`id`, `author`, `html`; автор 0 — FunPay) |
-| Отправить сообщение | `POST /runner/` с `request: {action: "chat_message", data: {node, last_message: -1, content}}` |
-| Витрина раздела | `GET /lots/<node>/` → все `a.tc-item`: `id` из ссылки, `data-user`, `data-online`, `data-f-*` (параметры), `.tc-price[data-s]` — цена для покупателя. Свои лоты идут **без** `data-user` — они отмечаются по ID |
+| Game ID of a category | `GET /lots/<node>/trade` → button `.js-lot-raise[data-game][data-node]` |
+| Raise | `POST /lots/raise` (`game_id`, `node_id`, `node_ids[]` — all your categories of that game). Response `{"error": false, "msg": …}` or `{"error": true, "msg": "Подождите 2 часа."}` (the wait is parsed by `parse_wait`; “час” without a number = 1 hour). If a `modal` with a category choice comes back — retry with all `node_ids[]` from it |
+| Sales | `GET /orders/trade[?state=paid|closed|refunded]`, next page — `POST` with `continue`. `a.tc-item`: class `info` — pending, `warning` — refund, otherwise closed; `.tc-order`, `.tc-date-time`, `.order-desc`, `.media-user-name`, `.tc-price` |
+| Order | `GET /orders/<id>/` → `.param-item` (h5 + value), `.order-review` (rating `rating<N>`, text, `.review-compiled-reply`), `.chat[data-id]` — chat ID, `button.btn-refund` — refund possible |
+| Refund | `POST /orders/refund` (`id`, `csrf_token`) |
+| Review reply | `POST /orders/review` (`authorId` = own ID, `text`, `rating`, `orderId`, `csrf_token`) |
+| Chat list | `POST /runner/` with a `chat_bookmarks` object → `a.contact-item` (`data-id`, `data-node-msg`, class `unread`) |
+| Chat history | `GET /chat/history?node=<id>&last_message=…` → `chat.messages[]` (`id`, `author`, `html`; author 0 — FunPay) |
+| Send a message | `POST /runner/` with `request: {action: "chat_message", data: {node, last_message: -1, content}}` |
+| Category storefront | `GET /lots/<node>/` → all `a.tc-item`: `id` from the link, `data-user`, `data-online`, `data-f-*` (parameters), `.tc-price[data-s]` — the buyer's price. Your own lots come **without** `data-user` — they're matched by ID |
 
-Даты вида «сегодня, 11:52» / «вчера, …» / «2 ноября, …» / «12 октября 2025, …» переводит в unix-время
-`parse_date`; срок из названия («НА 3 ЧАСА», «30 минут», «1 месяц») — `parse_duration` (в минутах).
+Dates like “сегодня, 11:52” / “вчера, …” / “2 ноября, …” / “12 октября 2025, …” are converted to unix time by
+`parse_date`; the duration from a title (“НА 3 ЧАСА”, “30 минут”, “1 месяц”) — by `parse_duration` (in minutes).
+The client always works with the Russian version of the site: these parsers rely on Russian text.
 
-### Аналитика и аренды (`features.py`)
-- **Статистика** — по продажам (`/orders/trade`, до 15 страниц, пока не выйдем за период). Возвраты считаются
-  отдельно и в выручку не входят. Основная валюта — с наибольшей выручкой. Лоты группируются по названию без
-  хвоста «, С подпиской, Pro», который FunPay дописывает к названию в заказе.
-- **Конкуренты** — для каждого вашего лота: группа «те же `data-f-*` и тот же срок», место по цене
-  (1 + число более дешёвых), минимум, медиана, 5 самых дешёвых. Для выключенных лотов (их нет на витрине) —
-  рынок того же срока.
-- **Аренды** — заказы (кроме возвратов) со сроком из названия до недели; конец = время заказа + срок +
-  бонусные минуты из настроек + ручная поправка по заказу (`accounts[uid].rentals_extra[номер]`, минуты,
-  меняется методом `rental_adjust(order_id, minutes)`; при изменении заказ убирается из `rentals_done` /
-  `rentals_warned`, чтобы напоминания сработали заново).
-- **Бэкап** — все не служебные поля формы каждого лота (`get_form`). Восстановление берёт свежую форму
-  раздела, подставляет поля по имени и сохраняет как **новый** лот (по умолчанию выключенным).
+### Analytics and rentals (`features.py`)
+- **Statistics** — from sales (`/orders/trade`, up to 15 pages until the period is covered). Refunds are counted
+  separately and aren't part of revenue. The main currency is the one with the highest revenue. Lots are grouped
+  by title without the “, С подпиской, Pro” tail FunPay appends to the title in an order.
+- **Competitors** — for each of your lots: the group “same `data-f-*` and same duration”, price rank
+  (1 + number of cheaper offers), minimum, median, the 5 cheapest. For disabled lots (not on the storefront) —
+  the market for the same duration.
+- **Rentals** — orders (except refunds) with a duration of up to a week in the title; end = order time + duration +
+  bonus minutes from the settings + a manual per-order adjustment (`accounts[uid].rentals_extra[number]`, minutes,
+  changed by `rental_adjust(order_id, minutes)`; on change the order is removed from `rentals_done` /
+  `rentals_warned` so the reminders fire again).
+- **Backup** — all non-system form fields of every lot (`get_form`). Restore takes a fresh form of the category,
+  fills in the fields by name and saves it as a **new** lot (disabled by default).
 
-### Фон (`background.py`)
-`Worker` — поток, просыпается каждые 10 секунд (или сразу по `wake`):
-- **автоподнятие** — для всех аккаунтов с включённым автоподнятием; у каждой игры свой срок следующей
-  попытки (`autoraise.next[game]` = ответ FunPay + 90 секунд), последняя попытка — в `autoraise.last`;
-- **обновления** — раз в 30 минут `Api.find_update()` (если включено `auto_update_check`); о каждой новой
-  версии (кроме пропущенной) — одно событие `update` в окно и уведомление ОС. Первую проверку при запуске
-  делает окно; из меню трея «Проверить обновления» отправляет окну событие `check_update`;
-- **заказы** (раз в минуту) и **чаты** (раз в 30 секунд) — только для открытого аккаунта; первый проход лишь
-  запоминает, что уже есть, потом новые оплаченные заказы и непрочитанные сообщения дают уведомление;
-- **аренды** — напоминание за 10 минут и по окончании, по желанию автосообщение в чат заказа
-  (ID обработанных заказов хранятся, чтобы не повторять).
+### Background (`background.py`)
+`Worker` is a thread that wakes up every 10 seconds (or immediately via `wake`):
+- **auto-raise** — for every account with auto-raise on; each game has its own next attempt time
+  (`autoraise.next[game]` = FunPay's answer + 90 seconds), the last attempt is in `autoraise.last`;
+- **updates** — every 30 minutes `Api.find_update()` (if `auto_update_check` is on); for each new version (except a
+  skipped one) — one `update` event to the window and an OS notification. The window does the first check at
+  startup; “Check for updates” in the tray menu sends the window a `check_update` event;
+- **orders** (every minute) and **chats** (every 30 seconds) — only for the open account; the first pass only
+  remembers what's there, after that new paid orders and unread messages produce a notification;
+- **rentals** — a reminder 10 minutes before the end and when it ends, optionally an automatic message to the
+  order's chat (IDs of processed orders are stored so it doesn't repeat).
 
-Уведомления: событие в окно (интерфейс забирает их методом `events()` раз в 5 секунд) + уведомление ОС:
-Windows — через значок в трее (pystray), macOS — `osascript display notification`, Linux — `notify-send`.
-Закрытие окна при «Работать в фоне»: обработчик `closing` возвращает `False`, окно прячется (Windows, трей)
-или сворачивается (macOS/Linux).
+Notifications: an event to the window (the interface collects them via `events()` every 5 seconds) + an OS
+notification: Windows — through the tray icon (pystray), macOS — `osascript display notification`, Linux —
+`notify-send`. Closing the window in background mode: the `closing` handler returns `False`, and the window hides
+(Windows, tray) or is minimized (macOS/Linux).
 
-### Финансы и вывод
+### Finances and withdrawals
 
-| Действие | Запрос |
+| Action | Request |
 |---|---|
-| Балансы и настройки вывода | `GET /account/balance` → форма `withdraw/withdraw`: `select[name=currency_id]` (балансы в `data-content`), JSON в `.withdraw-box[data-data]`: `currencies[cur].channels` (способы и `feeInfo`) и `extCurrencies[ext]` (`walletName`, сохранённые `wallets`), банки СБП — `select[name=wallet_extra]` |
-| История | `POST /users/transactions` с `user_id`, `filter` (`""`, `payment`, `withdraw`, `order`, `other`), `continue` (курсор). Ответ — HTML с `.tc-item` и новым `continue` |
-| Сумма к получению | `POST /withdraw/calc` (`currency_id`, `ext_currency_id`, `wallet`, `amount_int`) → `{"amount_ext": …}` |
-| Вывод, шаг 1 | `POST /withdraw/withdraw` с `preview=1` → проверка и итог (`wallet`, `amount_int`, `amount_ext`, `twofactor_enabled`), **без списания** |
-| Вывод, шаг 2 | тот же запрос с `preview=""` и `twofactor_code` → заявка на вывод. Ошибки: `error`+`msg` или `twofactor_error`+`twofactor_msg` |
+| Balances and withdrawal options | `GET /account/balance` → the `withdraw/withdraw` form: `select[name=currency_id]` (balances in `data-content`), JSON in `.withdraw-box[data-data]`: `currencies[cur].channels` (methods and `feeInfo`) and `extCurrencies[ext]` (`walletName`, saved `wallets`), SBP banks — `select[name=wallet_extra]` |
+| History | `POST /users/transactions` with `user_id`, `filter` (`""`, `payment`, `withdraw`, `order`, `other`), `continue` (cursor). The response is HTML with `.tc-item` and a new `continue` |
+| Amount you receive | `POST /withdraw/calc` (`currency_id`, `ext_currency_id`, `wallet`, `amount_int`) → `{"amount_ext": …}` |
+| Withdrawal, step 1 | `POST /withdraw/withdraw` with `preview=1` → validation and summary (`wallet`, `amount_int`, `amount_ext`, `twofactor_enabled`), **no debit** |
+| Withdrawal, step 2 | the same request with `preview=""` and `twofactor_code` → a withdrawal request. Errors: `error`+`msg` or `twofactor_error`+`twofactor_msg` |
 
-Двухшаговая схема повторяет логику сайта (`app.bundle.js`, обработчик формы `.withdraw-box`).
-Для СБП (`ext_currency_id=fps`) дополнительно отправляется `wallet_extra` — ID банка.
+The two-step scheme follows the site's logic (`app.bundle.js`, the `.withdraw-box` form handler).
+For SBP (`ext_currency_id=fps`) `wallet_extra` — the bank ID — is sent as well.
 
-### Автообновление (`updater.py`)
-1. `GET https://api.github.com/repos/ivasantai/funpay-lots/releases/latest` (без токена — репозиторий публичный).
-2. Версия из `tag_name` сравнивается с `VERSION`; описание релиза показывается как список изменений.
-   Файл выбирается по ОС и архитектуре (`updater.asset_name()`): `FunPayLots.exe`,
+### Auto-update (`updater.py`)
+1. `GET https://api.github.com/repos/ivasantai/funpay-lots/releases/latest` (no token — the repository is public).
+2. The version from `tag_name` is compared with `VERSION`; the release description is shown as the list of changes.
+   The file is picked by OS and architecture (`updater.asset_name()`): `FunPayLots.exe`,
    `FunPayLots-macos-{arm64|x86_64}.zip`, `FunPayLots-linux-x86_64.tar.gz`.
-3. Установка — только в собранной версии (`sys.frozen`):
-   - **Windows:** новый exe скачивается рядом (скрытый `.FunPayLots.new.exe`); запущенный exe
-     переносится во `%TEMP%\FunPayLots-old-<время>.exe` (Windows разрешает перенос, но не удаление; если
-     TEMP на другом диске — в скрытый `.FunPayLots.old` рядом), новый встаёт на его место и запускается
-     с `PYINSTALLER_RESET_ENVIRONMENT=1`. Новый процесс создаётся с `CREATE_BREAKAWAY_FROM_JOB`: загрузчик
-     PyInstaller держит приложение в job object, который при выходе старой версии убил бы и новую. Если job
-     не разрешает выход — запуск через `explorer.exe`, как двойной клик.
-   - **macOS:** zip распаковывается через `ditto` (сохраняет права и симлинки). Куда ставить: на место
-     запущенного `.app`; если он запущен из App Translocation (read-only копия для файлов с карантином) —
-     в настоящую папку, которую возвращает `SecTranslocateCreateOriginalPathForURL` (Security.framework,
-     через ctypes), а если её не узнать или там нет прав — в `/Applications` или `~/Applications`.
-     Старый `.app` уходит во временную папку, новый копируется на место, с него снимается карантин
-     (иначе macOS снова запустит его из read-only копии). Фоновый `sh` ждёт выхода процесса, удаляет
-     временную папку и делает `open`.
-   - **Linux:** из tar.gz извлекается `FunPayLots` во временный файл рядом и атомарно заменяет старый
-     (`os.replace`; запущенный процесс продолжает работать со старым файлом), затем новая версия
-     запускается в отдельной сессии.
-4. Текущее окно закрывается. При старте `cleanup_old()` удаляет остатки прошлого обновления; если старый
-   процесс ещё держит файл, попытки повторяются в фоне до минуты.
+3. Installation — only in the built app (`sys.frozen`):
+   - **Windows:** the new exe is downloaded next to the old one (hidden `.FunPayLots.new.exe`); the running exe is
+     moved to `%TEMP%\FunPayLots-old-<time>.exe` (Windows allows moving it, but not deleting; if TEMP is on another
+     drive — to a hidden `.FunPayLots.old` next to it), the new one takes its place and starts with
+     `PYINSTALLER_RESET_ENVIRONMENT=1`. The new process is created with `CREATE_BREAKAWAY_FROM_JOB`: the PyInstaller
+     bootloader keeps the app in a job object that would kill the new version when the old one exits. If the job
+     doesn't allow breakaway — it's started via `explorer.exe`, like a double click.
+   - **macOS:** the zip is unpacked with `ditto` (keeps permissions and symlinks). Where to install: in place of the
+     running `.app`; if it runs from App Translocation (a read-only copy for quarantined files) — into the real
+     folder returned by `SecTranslocateCreateOriginalPathForURL` (Security.framework, via ctypes), and if that can't
+     be determined or isn't writable — into `/Applications` or `~/Applications`. The old `.app` goes to a temporary
+     folder, the new one is copied in place, and its quarantine flag is removed (otherwise macOS would run it from a
+     read-only copy again). A background `sh` waits for the process to exit, deletes the temporary folder and runs `open`.
+   - **Linux:** `FunPayLots` is extracted from the tar.gz into a temporary file next to it and atomically replaces the
+     old one (`os.replace`; the running process keeps using the old file), then the new version starts in a separate
+     session.
+4. The current window closes. At startup `cleanup_old()` removes leftovers of the previous update; if the old
+   process still holds the file, it retries in the background for up to a minute.
 
-`FunPayLots.exe --update` — то же без интерфейса (результат в `update.log` рядом с `config.json`).
-`FPL_VERSION_OVERRIDE=1.0.0` заставляет приложение считать себя старой версией — для проверки обновления.
+`FunPayLots.exe --update` — the same without the interface (result in `update.log` next to `config.json`).
+`FPL_VERSION_OVERRIDE=1.0.0` makes the app think it's an old version — for testing updates.
 
-### Окно и платформы
-- Интерфейс передаётся в окно строкой (`create_window(html=...)`), иконка встраивается как data URI.
-  Встроенный HTTP-сервер pywebview не используется: при запуске он резолвит имя компьютера, из-за чего
-  macOS 15 показывает запрос доступа к локальной сети.
-- Движок окна: Edge WebView2 (Windows), WKWebView (macOS), QtWebEngine через PyQt6 (Linux — его можно
-  упаковать внутрь приложения, в отличие от GTK/WebKitGTK). На Linux в собранной версии отключена
-  песочница Chromium (`QTWEBENGINE_DISABLE_SANDBOX=1`): в упакованном приложении она часто недоступна
-  из-за ограничений user namespaces, а окно показывает только локальный интерфейс приложения.
-- Параметр `icon` у `webview.start` передаётся только на Linux: на Windows он ждёт `.ico` и падает на `.png`.
-- `--selftest` — проверка сборки без окна: импортирует все модули (включая движок окна этой ОС
-  и SDK Anthropic), проверяет файлы интерфейса, пишет `selftest.log`, код возврата 0/1.
-- Ошибки запуска пишутся в `app.log` в папке настроек (у собранного приложения нет консоли).
+### Window and platforms
+- The interface is passed to the window as a string (`create_window(html=...)`), and the icon is embedded as a
+  data URI. pywebview's built-in HTTP server isn't used: at startup it resolves the computer name, which makes
+  macOS 15 ask for local network access.
+- Window engine: Edge WebView2 (Windows), WKWebView (macOS), QtWebEngine via PyQt6 (Linux — it can be packed
+  inside the app, unlike GTK/WebKitGTK). In the Linux build the Chromium sandbox is disabled
+  (`QTWEBENGINE_DISABLE_SANDBOX=1`): in a packed app it's often unavailable because of user namespace
+  restrictions, and the window only shows the app's local interface.
+- The `icon` parameter of `webview.start` is passed only on Linux: on Windows it expects `.ico` and crashes on `.png`.
+- `--selftest` — a build check without a window: imports every module (including this OS's window engine and the
+  Anthropic SDK), checks the interface files and the translation dictionary, writes `selftest.log`, exit code 0/1.
+- Startup errors go to `app.log` in the settings folder (the built app has no console).
 
-### Нейросеть (`ai.py`)
-Официальный SDK `anthropic`, модель `claude-opus-5-5`, один запрос `beta.messages.create` на действие:
+### Interface language
+The interface is written in Russian; English is the `ui/i18n_en.json` dictionary. `tools/i18n_build.py` builds it
+from two parts: `EXACT` — exact phrases, `PATTERNS` — regular expressions for phrases with numbers and names
+(“Выбрано: 3”, “вчера, 16:27”, “Подождите 2 часа.”). The lookup order is the same in JS (`tr()` in
+`ui/index.html`) and Python (`i18n.tr()`): exact match (ignoring extra whitespace) → the first matching pattern
+(groups `$1…` are translated recursively) → splitting by “ • ”, “ · ”, “ — ”, “: ” and translating the parts.
+If nothing matches, the string stays as it is.
 
-- **Структурированный ответ** — `output_config.format` с JSON-схемой (`summary`, `desc`, `payment_msg`
-  и при переводе/«сразу на английском» — `*_en`), поэтому ответ всегда разбирается в поля формы без парсинга текста.
-- **Effort** — `medium` для генерации, `low` для перевода (простая задача, быстрее и дешевле).
-- **Отказы** — включён серверный резерв `fallbacks: "default"` (beta `server-side-fallback-2026-07-01`):
-  если классификатор безопасности отклонит запрос, API сам повторит его на рекомендованной модели.
-  Если отказала и она — `stop_reason: "refusal"` показывается как понятная ошибка.
-- **Системный промпт** задаёт роль копирайтера FunPay и правила площадки (без контактов и ссылок вне FunPay,
-  без выдуманных фактов). В запрос уходят раздел, значения выпадающих полей лота, вводные и текущий русский текст.
-- Проверка ключа — `models.retrieve` (бесплатно, без генерации).
-- `import ai` делается лениво: SDK загружается только при первом использовании, чтобы не замедлять старт.
-- `FPL_ANTHROPIC_BASE_URL` — подменить адрес API (для проверки на локальной заглушке).
+- **Window:** a `MutationObserver` translates text nodes and `placeholder`/`title` attributes on every page change,
+  so the interface code doesn't need to be rewritten around `t()`. The original is kept (`WeakMap`) — switching
+  back to Russian restores the text. Inputs and user content aren't translated (the `NOTR` selector: chat messages,
+  lot titles in the table, values in the order card, reviews). Numbers and dates are formatted with `LOC()`
+  (`ru-RU` / `en-US`).
+- **Python:** `api_call` translates error texts, `Api.notify` and `Notifier.os_notify` translate notifications,
+  and the tray menu takes its labels through `Notifier.translate`. The window reports the language via `set_ui_lang()`.
+- **The `lang` setting:** `auto` (by `navigator.language`: ru/uk/be/kk → Russian, otherwise English), `ru`, `en`.
+- The dictionary is embedded into the page at startup (`page_html()` replaces `/*I18N_EN*/`); in a browser
+  (`?mock`) the page loads `i18n_en.json` itself.
+- **Release notes** contain the English part, a `<!-- ru -->` marker and the Russian part (built by
+  `.github/workflows/build.yml` from `CHANGELOG.md` and `CHANGELOG.ru.md`); the update card shows the part in the
+  interface language.
 
-### Бесплатный перевод (`free_translate.py`)
-`GET https://api.mymemory.translated.net/get?q=…&langpair=ru|en[&de=почта]` — публичный API без ключа.
-- Лимит запроса — 500 байт, поэтому текст переводится **по строкам** (так же сохраняются переносы),
-  длинные строки режутся по предложениям/словам до 450 байт. До 4 запросов параллельно.
-- Края строки (маркеры `•`, эмодзи, знаки препинания — всё, что не буквы/цифры) отрезаются до перевода
-  и возвращаются после: переводчик их теряет или переставляет.
-- Строки без кириллицы и повторяющиеся строки не отправляются (экономия дневного лимита).
-- Исчерпанный лимит: `quotaFinished`, статус 429 или текст `MYMEMORY WARNING` → понятная ошибка.
-- Выбор движка в `Api.ai_translate`: настройка `translator` (`auto` по умолчанию: Claude при наличии ключа).
+### AI (`ai.py`)
+The official `anthropic` SDK, model `claude-opus-5-5`, one `beta.messages.create` request per action:
 
-### Динамическая форма
-`get_form` превращает HTML-форму в список полей:
+- **Structured output** — `output_config.format` with a JSON schema (`summary`, `desc`, `payment_msg`, and `*_en`
+  for translation / “English version too”), so the answer always maps onto the form fields without text parsing.
+- **Effort** — `medium` for generation, `low` for translation (a simple task, faster and cheaper).
+- **Refusals** — server-side fallback `fallbacks: "default"` is on (beta `server-side-fallback-2026-07-01`): if a
+  safety classifier declines the request, the API retries it on the recommended model. If that one declines too,
+  `stop_reason: "refusal"` is shown as a clear error.
+- **The system prompt** sets the role of a FunPay copywriter and the marketplace rules (no contacts or links
+  outside FunPay, no invented facts). The request includes the category, the lot's drop-down values, the brief
+  and the current Russian text.
+- Key check — `models.retrieve` (free, no generation).
+- `import ai` is lazy: the SDK loads only on first use so startup stays fast.
+- `FPL_ANTHROPIC_BASE_URL` — override the API address (for testing against a local stub).
+
+### Free translation (`free_translate.py`)
+`GET https://api.mymemory.translated.net/get?q=…&langpair=ru|en[&de=email]` — a public API without a key.
+- The request limit is 500 bytes, so text is translated **line by line** (which also keeps line breaks); long
+  lines are split by sentences/words into chunks of up to 450 bytes. Up to 4 requests in parallel.
+- The edges of a line (`•` markers, emoji, punctuation — everything that isn't a letter/digit) are cut off before
+  translation and put back afterwards: the translator loses or moves them.
+- Lines without Cyrillic and duplicate lines aren't sent (saves the daily limit).
+- Limit exhausted: `quotaFinished`, status 429 or the text `MYMEMORY WARNING` → a clear error.
+- The engine is chosen in `Api.ai_translate`: the `translator` setting (`auto` by default: Claude if there's a key).
+
+### Dynamic form
+`get_form` turns the HTML form into a list of fields:
 
 ```json
 {"name": "fields[type]", "label": "Тип подписки", "kind": "select",
@@ -233,25 +263,25 @@ Windows — через значок в трее (pystray), macOS — `osascript 
  "locale": "", "conditional": false}
 ```
 
-`kind`: `text`, `textarea`, `select`, `checkbox`, `hidden` (например `fields[images]`) и `system`
-(`csrf_token`, `form_created_at`, `offer_id`, `node_id`, `location`, `deleted` — не показываются, но
-отправляются обратно). `locale: "en"` уходит в блок «English version». `conditional: true` — поле,
-которое сайт скрывает до выбора других полей.
+`kind`: `text`, `textarea`, `select`, `checkbox`, `hidden` (e.g. `fields[images]`) and `system`
+(`csrf_token`, `form_created_at`, `offer_id`, `node_id`, `location`, `deleted` — not shown, but sent back).
+`locale: "en"` goes into the “English version” block. `conditional: true` — a field the site hides until other
+fields are chosen.
 
-Интерфейс рисует форму по этому списку и возвращает его же с новыми `value` — поэтому любые поля любых
-разделов поддерживаются без доработок кода. Чекбоксы отправляются как в браузере: `on`, если отмечен,
-иначе поле не отправляется.
+The interface draws the form from this list and returns it with new `value`s — so any fields of any category are
+supported without code changes. Checkboxes are sent like a browser does: `on` when checked, otherwise the field
+isn't sent.
 
-### Почему список лотов собирается из нескольких источников
-Профиль показывает только разделы с активными лотами, а страница `/lots/<node>/trade` — все свои лоты
-раздела, но для неё нужно знать `node`. Поэтому `Api.lots()` объединяет:
-1. разделы из профиля;
-2. разделы, сохранённые в `config.json` (где приложение уже видело лоты или создавало их);
+### Why the lot list is assembled from several sources
+The profile shows only categories with active lots, while `/lots/<node>/trade` shows all your lots of a category,
+but you need to know `node` for it. So `Api.lots()` combines:
+1. categories from the profile;
+2. categories saved in `config.json` (where the app has already seen or created lots);
 
-и параллельно (4 потока) загружает `/trade` для каждого.
+and loads `/trade` for each of them in parallel (4 threads).
 
-## Хранение настроек
-`config.json` в папке пользователя (пути — в [USER_GUIDE.md](USER_GUIDE.md#ключ-доступа-golden_key)):
+## Settings storage
+`config.json` in the user's folder (paths — in the [user guide](USER_GUIDE.md#access-key-golden_key)):
 
 ```json
 {
@@ -261,24 +291,24 @@ Windows — через значок в трее (pystray), macOS — `osascript 
       "golden_key": "…", "username": "MyShop",
       "nodes": {"1355": "Аккаунты ChatGPT", "1392": "Прочее Telegram"},
       "autoraise": {"enabled": true, "nodes": [], "next": {"334": 1794050000}, "last": {"334": {"ok": false, "msg": "Подождите 3 часа."}}},
-      "rentals_done": ["ORDER001"], "rentals_warned": []
+      "rentals_done": ["ORDER001"], "rentals_warned": [], "rentals_extra": {"ORDER002": 60}
     }
   },
-  "templates": [{"id": "…", "name": "Аренда ChatGPT", "fields": {"fields[desc][ru]": "…"}}],
-  "theme": "auto", "close_to_background": false, "notify_orders": true, "rental_msg": "…",
+  "templates": [{"id": "…", "name": "ChatGPT rental", "fields": {"fields[desc][ru]": "…"}}],
+  "lang": "auto", "theme": "auto", "close_to_background": false, "notify_orders": true, "rental_msg": "…",
   "anthropic_key": "…", "translator": "auto"
 }
 ```
-До 1.6.0 `golden_key` и `nodes` лежали в корне — при первом входе новой версией они переносятся в аккаунт.
-Простые настройки интерфейс меняет через `set_setting` (только ключи из `SETTINGS_KEYS` в `app.py`).
-Файл пишется атомарно (через `.tmp`), на macOS — с правами `600`. Ключ хранится открытым текстом,
-так же как его хранит браузер.
+Before 1.6.0 `golden_key` and `nodes` lived at the root — they are moved into the account at the first sign-in
+with a newer version. The interface changes simple settings via `set_setting` (only keys from `SETTINGS_KEYS` in
+`app.py`). The file is written atomically (via `.tmp`), with `600` permissions on macOS/Linux. The key is stored
+in plain text, just like the browser stores it.
 
-## Безопасность
-- Ключ уходит только на `funpay.com`. Кроме FunPay приложение обращается к GitHub
-  (`api.github.com` и скачивание релиза) — без ключа и личных данных — и, только по кнопкам ИИ,
-  к `api.anthropic.com` (тексты лота и вводные; golden_key туда не отправляется), а по кнопке
-  перевода без ключа — к `api.mymemory.translated.net` (только русские строки лота и, если указана, почта).
-- Вывод средств всегда идёт в два шага: предпросмотр от FunPay → явное подтверждение пользователем.
-- `open_url` открывает только `https://funpay.com/…` и страницы этого репозитория.
-- Все данные с FunPay выводятся в интерфейс через экранирование (`esc()`), HTML из лотов не исполняется.
+## Security
+- The key is sent only to `funpay.com`. Besides FunPay the app talks to GitHub (`api.github.com` and release
+  downloads) — without the key or personal data — and, only through the AI buttons, to `api.anthropic.com`
+  (lot texts and the brief; the golden_key isn't sent there), and through translation without a key — to
+  `api.mymemory.translated.net` (only the lot's Russian lines and, if set, the email).
+- Withdrawals always take two steps: a preview from FunPay → explicit confirmation by the user.
+- `open_url` opens only `https://funpay.com/…`, this repository's pages and the Anthropic console.
+- All data from FunPay is escaped before it's shown in the interface (`esc()`); HTML from lots is never executed.

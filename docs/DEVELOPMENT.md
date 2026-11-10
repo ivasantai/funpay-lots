@@ -1,6 +1,8 @@
-# Разработка и сборка
+# Development and builds
 
-## Запуск из исходников
+**English** · [Русский](DEVELOPMENT.ru.md)
+
+## Running from source
 
 Windows:
 ```powershell
@@ -9,111 +11,132 @@ py -m venv .venv
 .venv\Scripts\python app.py
 ```
 
-macOS и Linux:
+macOS and Linux:
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python app.py
 ```
-На Linux `requirements.txt` ставит pywebview с Qt (PyQt6 + PyQt6-WebEngine); могут понадобиться системные
-библиотеки из шага «System libraries for Qt» в `.github/workflows/build.yml`.
+On Linux `requirements.txt` installs pywebview with Qt (PyQt6 + PyQt6-WebEngine); you may need the system
+libraries from the “System libraries for Qt” step in `.github/workflows/build.yml`.
 
-Переменная окружения `FPL_DEBUG=1` запускает окно в режиме отладки pywebview (с инструментами разработчика).
+The environment variable `FPL_DEBUG=1` starts the window in pywebview debug mode (with developer tools).
 
-## Интерфейс без Python-части
+## The interface without the Python side
 ```bash
 python -m http.server 8765 -d ui
 ```
-Откройте `http://localhost:8765/index.html?mock` — интерфейс работает на фейковых данных из `ui/mock.js`.
-Удобно для правок вёрстки. Новый метод в `Api` добавляйте и в `mock.js`.
+Open `http://localhost:8765/index.html?mock` — the interface runs on fake data from `ui/mock.js`.
+Handy for layout changes. When you add a method to `Api`, add it to `mock.js` as well. Put only made-up
+nicknames, order numbers and amounts into demo data and documentation — the repository is public.
 
-## Сборка
+## Interface translation
+Interface texts are written in Russian directly in `ui/index.html` and in Python messages. English is the
+dictionary in `tools/i18n_build.py` (`EXACT` — exact phrases, `PATTERNS` — patterns with `$1`, `$2` for numbers
+and names). When you add or change a text, add its translation and rebuild the dictionary:
+```bash
+python tools/i18n_build.py
+```
+To check that nothing is left in Russian: open `index.html?mock` and run in the browser console
+```js
+const s = document.createElement("script"); s.src = "i18n_audit.js"; document.head.append(s);
+// once loaded:
+await i18nAudit()
+```
+The audit walks through every screen in English and returns the strings that stayed in Russian
+(lot titles, messages and reviews from the demo data are content and don't need translating).
+How translation works — see [ARCHITECTURE.md](ARCHITECTURE.md#interface-language).
 
-### Локально
+## Building
+
+### Locally
 ```bash
 pyinstaller --noconfirm funpay_lots.spec
 ```
-- Windows → `dist/FunPayLots.exe` (один файл).
-- macOS → `dist/FunPay Lots.app` под архитектуру Python, на котором собираете (arm64 или x86_64).
-- Linux → `dist/FunPayLots` (один файл с QtWebEngine).
+- Windows → `dist/FunPayLots.exe` (a single file).
+- macOS → `dist/FunPay Lots.app` for the architecture of the Python you build with (arm64 or x86_64).
+- Linux → `dist/FunPayLots` (a single file with QtWebEngine).
 
-Проверка сборки без окна: `FunPayLots --selftest` (код возврата 0 — все модули и файлы на месте).
-Каждая ОС собирается только на себе — для остальных есть GitHub Actions.
+Checking a build without a window: `FunPayLots --selftest` (exit code 0 — all modules, files and the dictionary
+are in place). Each OS can only be built on itself — GitHub Actions handles the rest.
 
 ### GitHub Actions
-`.github/workflows/build.yml` собирает четыре версии:
+`.github/workflows/build.yml` builds four versions:
 
-| Задача | Раннер | Результат |
+| Job | Runner | Result |
 |---|---|---|
 | windows | `windows-latest` | `FunPayLots.exe` |
 | macos arm64 | `macos-latest` | `FunPayLots-macos-arm64.zip` |
 | macos x86_64 | `macos-15-intel` | `FunPayLots-macos-x86_64.zip` |
-| linux | `ubuntu-22.04` (старый glibc — шире совместимость) | `FunPayLots-linux-x86_64.tar.gz` |
+| linux | `ubuntu-22.04` (older glibc — wider compatibility) | `FunPayLots-linux-x86_64.tar.gz` |
 
-Для каждой: сборка → `--selftest` (падение ломает сборку) → пробный запуск окна на 20–25 секунд со
-скриншотом экрана (артефакт `smoke-*`, на результат не влияет — для визуальной проверки).
+For each: build → `--selftest` (a failure breaks the build) → a 20–25 second trial run of the window with a
+screenshot (artifact `smoke-*`, doesn't affect the result — for a visual check).
 
-- **вручную:** Actions → build → Run workflow — файлы и скриншоты в артефактах запуска;
-- **по тегу `v*`:** дополнительно создаётся GitHub Release со всеми четырьмя файлами.
+- **manually:** Actions → build → Run workflow — files and screenshots in the run's artifacts;
+- **on a `v*` tag:** additionally creates a GitHub Release with all four files.
 
-## Выпуск новой версии
-Пользователи получают обновление автоматически, поэтому номер версии в теге, `app.py` и `.spec`
-должен совпадать, а раздел в `CHANGELOG.md` — называться `## X.Y.Z — дата`: его текст становится
-описанием релиза и показывается в карточке обновления.
+## Releasing a new version
+Users get updates automatically, so the version in the tag, `app.py` and `.spec` must match, and the sections in
+`CHANGELOG.md` (English) and `CHANGELOG.ru.md` (Russian) must be titled `## X.Y.Z — date`: their text becomes the
+release description (English, a `<!-- ru -->` marker, Russian), and the update card shows the part in the
+interface language.
 
-1. Поднимите версию в `app.py` (`VERSION`) и `funpay_lots.spec` (`VERSION`), допишите `CHANGELOG.md`.
-2. Закоммитьте и запушьте.
-3. Поставьте тег:
+1. Bump the version in `app.py` (`VERSION`) and `funpay_lots.spec` (`VERSION`), update both changelogs.
+2. Commit and push.
+3. Create a tag:
    ```bash
    git tag v1.2.0
    ```
    ```bash
    git push origin v1.2.0
    ```
-4. Через ~5 минут релиз появится на странице Releases.
+4. In about 5 minutes the release appears on the Releases page.
 
-## Иконка
-Положите квадратную картинку в `assets/icon-source.<png|webp|jpg>` (лучше от 1024 px) и выполните:
+## Icon
+Put a square image into `assets/icon-source.<png|webp|jpg>` (1024 px or more is best) and run:
 ```bash
 python tools/make_icons.py
 ```
-Скрипт сделает `assets/icon.ico` (Windows, скруглённые углы), `assets/icon.icns` (macOS, плитка с полями
-по гайдлайнам Apple), `assets/icon.png` и `ui/icon.png`. Нужен Pillow (`pip install pillow`).
+The script creates `assets/icon.ico` (Windows, rounded corners), `assets/icon.icns` (macOS, a tile with margins
+following Apple's guidelines), `assets/icon.png` and `ui/icon.png`. Needs Pillow (`pip install pillow`).
 
-## Когда FunPay меняет сайт
-Клиент разбирает HTML, поэтому изменения вёрстки FunPay могут его сломать. Порядок действий:
-1. Посмотрите текст ошибки в приложении (или запустите `python app.py` из консоли — там будет трассировка).
-2. Найдите в [ARCHITECTURE.md](ARCHITECTURE.md#как-работает-клиент-funpay) запрос и селектор, который используется для этого действия.
-3. Откройте ту же страницу в браузере, сверьте разметку (DevTools → Elements) и поправьте селектор в `funpay_client.py`.
+## When FunPay changes its site
+The client parses HTML, so FunPay layout changes can break it. What to do:
+1. Look at the error text in the app (or run `python app.py` from a console — there'll be a traceback).
+2. Find the request and selector used for that action in [ARCHITECTURE.md](ARCHITECTURE.md#how-the-funpay-client-works).
+3. Open the same page in a browser, compare the markup (DevTools → Elements) and fix the selector in `funpay_client.py`.
 
-Чаще всего меняются: классы в `/lots/<node>/trade` (`tc-item`, `tc-desc-text`, `tc-price`),
-`data-app-data` на главной, набор cookie (сейчас их сохраняет `requests.Session`).
+The things that change most often: classes on `/lots/<node>/trade` (`tc-item`, `tc-desc-text`, `tc-price`),
+`data-app-data` on the home page, the set of cookies (currently kept by `requests.Session`).
 
-## Проверка автообновления
-Соберите exe, положите копию в отдельную папку и запустите её как «старую» версию:
+## Testing auto-update
+Build the exe, put a copy into a separate folder and run it as an “old” version:
 ```powershell
 $env:FPL_VERSION_OVERRIDE = "1.0.0"; .\FunPayLots.exe --update
 ```
-Exe должен замениться последним релизом (сверьте хэш с файлом из Releases) и запуститься.
-Результат — в `%APPDATA%\FunPayLots\update.log`. На macOS аналогично: `FPL_VERSION_OVERRIDE=1.0.0 "FunPay Lots.app/Contents/MacOS/FunPay Lots" --update`.
+The exe should be replaced with the latest release (compare its hash with the file from Releases) and start.
+The result is in `%APPDATA%\FunPayLots\update.log`. On macOS: `FPL_VERSION_OVERRIDE=1.0.0 "FunPay Lots.app/Contents/MacOS/FunPay Lots" --update`.
 
-## Проверка нейросети без ключа
-Запросы можно направить на локальную заглушку, которая отвечает в формате Messages API:
-`FPL_ANTHROPIC_BASE_URL=http://127.0.0.1:<порт>`. Так проверяется сборка запроса (модель, beta-заголовок,
-JSON-схема) и разбор ответа, включая `stop_reason: "refusal"`. Качество текста проверяется только с настоящим ключом.
+## Testing the AI without a key
+Requests can be pointed at a local stub that answers in the Messages API format:
+`FPL_ANTHROPIC_BASE_URL=http://127.0.0.1:<port>`. This checks how the request is built (model, beta header,
+JSON schema) and how the response is parsed, including `stop_reason: "refusal"`. Text quality can only be checked
+with a real key.
 
-## Ручная проверка перед релизом
-Проверяйте на неактивном тестовом лоте, чтобы его не увидели покупатели:
-1. Вход по ключу, загрузка списка.
-2. «Новый лот» → раздел → заполнить, снять «Активное» → создать. Лот появляется серым.
-3. Изменить цену/название → сохранить → открыть снова, проверить значения.
-4. Сохранить с пустой ценой — должна быть понятная ошибка.
-5. Удалить лот — он пропадает из списка.
-6. «Финансы»: балансы совпадают с сайтом, история подгружается, фильтры работают.
-7. Редактор: «✨ Заполнить с ИИ» и «🌐 Перевести» заполняют поля (нужен ключ в ⚙), сохранение не происходит само.
-   Дублирование (⧉) открывает копию, массовая замена текста/цены — на выключенном тестовом лоте.
-8. ⚡ Поднятие: «Поднять» в окне автоподнятия даёт «подняты» или «подождите N часов».
-9. Заказы, чаты, аналитика открываются; отправку сообщений, возвраты и ответы на отзывы проверять
-   только осознанно — это действия на настоящем аккаунте.
-10. Окно вывода: «К получению» считается; шаг «Далее» показывает итог. Подтверждать вывод — только
-   осознанно и на небольшую сумму: это настоящая заявка.
+## Manual check before a release
+Use an inactive test lot so buyers don't see it:
+1. Sign in with the key, load the list.
+2. “New lot” → category → fill in, uncheck “Active” → create. The lot appears greyed out.
+3. Change the price/title → save → open again, check the values.
+4. Save with an empty price — there should be a clear error.
+5. Delete the lot — it disappears from the list.
+6. “Finances”: balances match the site, history loads, filters work.
+7. Editor: “✨ Fill in with AI” and “🌐 Translate” fill in the fields (needs a key in ⚙); nothing is saved by itself.
+   Duplicate (⧉) opens a copy; bulk text/price replacement — on a disabled test lot.
+8. ⚡ Raise: “Raise” in the auto-raise window answers “raised” or “wait N hours”.
+9. Orders, chats and analytics open; check sending messages, refunds and review replies only deliberately — these
+   are actions on a real account.
+10. Withdrawal window: “You receive” is calculated; “Next” shows the summary. Confirm a withdrawal only
+   deliberately and for a small amount: it's a real request.
+11. Switch the language to English (⚙ or RU / EN on the sign-in screen) and go through the tabs.

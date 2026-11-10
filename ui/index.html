@@ -43,6 +43,9 @@ textarea{resize:vertical;min-height:90px}
 /* login */
 #login{height:100%;display:grid;place-items:center;padding:16px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:28px;width:min(460px,100%)}
+.card{position:relative}
+.lang-seg{position:absolute;top:18px;right:18px}
+.lang-seg button{padding:4px 10px;font-size:12.5px}
 .card h1{margin:0 0 4px;font-size:22px}
 .card p{margin:0 0 18px}
 .field{margin-bottom:14px}
@@ -247,6 +250,7 @@ tr.clickable td{cursor:pointer}
 <div id="login" class="hidden">
   <div class="card">
     <img class="brand" src="icon.png" alt="">
+    <div class="seg lang-seg"><button class="lang-btn" data-lang="ru">RU</button><button class="lang-btn" data-lang="en">EN</button></div>
     <h1>FunPay Lots</h1>
     <p class="muted">Управление лотами вашего аккаунта FunPay</p>
     <div class="field">
@@ -331,6 +335,104 @@ const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
+/* ---------- язык интерфейса ----------
+   Интерфейс написан по-русски; английский — словарь ui/i18n_en.json (собирается tools/i18n_build.py).
+   Переводчик меняет текст на экране «на лету» (MutationObserver), поэтому новые окна, всплывашки и ответы
+   сервера переводятся сами. Пользовательский контент (сообщения, названия лотов, отзывы) не трогается. */
+/*I18N_EN*/
+const I18N = { exact: {}, pats: [], lang: "ru", orig: new WeakMap(), missing: new Set() };
+const CYR = /[А-Яа-яЁё]/;
+const LOC = () => I18N.lang === "en" ? "en-US" : "ru-RU";
+function i18nLoad(dict){
+  if (!dict) return;
+  I18N.exact = dict.exact || {};
+  I18N.pats = (dict.patterns || []).map(([p, r]) => [new RegExp(p), r]);
+}
+i18nLoad(window.I18N_EN);
+function tr(s, depth=0){
+  if (I18N.lang !== "en" || !s || !CYR.test(s) || depth > 6) return s;
+  const t = s.trim().replace(/\s+/g, " "); if (!t) return s;  // переносы и отступы из разметки не мешают поиску
+  const lead = s.slice(0, s.length - s.trimStart().length), trail = s.slice(s.trimEnd().length);
+  let out = I18N.exact[t];
+  if (out === undefined){
+    for (const [re, rep] of I18N.pats){
+      const m = t.match(re);
+      if (m && m[0] === t){ out = rep.replace(/\$(\d)/g, (_, i) => tr(m[+i] || "", depth + 1)); break; }
+    }
+  }
+  if (out === undefined){
+    for (const sep of [" • ", " · ", " — ", ": "]){
+      if (!t.includes(sep)) continue;
+      const parts = sep === ": " ? [t.slice(0, t.indexOf(sep)), t.slice(t.indexOf(sep) + 2)] : t.split(sep);
+      const tp = parts.map(p => tr(p, depth + 1));
+      if (tp.some((p, i) => p !== parts[i])){ out = tp.join(sep); break; }
+    }
+  }
+  if (out === undefined){ if (depth === 0) I18N.missing.add(t); return s; }
+  return lead + out + trail;
+}
+// Куда не заглядывать: ввод пользователя и пользовательский контент.
+const NOTR = "textarea, input, script, style, .msg, .citem .l, td.title .t, .params .v, .review-text, .notes, .notr, .pick span b";
+function trNode(n){
+  if (n.nodeType === 3){
+    const p = n.parentElement;
+    if (!p || p.closest(NOTR)) return;
+    const src = I18N.orig.has(n) ? I18N.orig.get(n) : n.nodeValue;
+    if (I18N.lang === "en"){
+      if (!CYR.test(n.nodeValue)) return;
+      const t = tr(n.nodeValue);
+      if (t !== n.nodeValue){ I18N.orig.set(n, n.nodeValue); n.nodeValue = t; }
+    } else if (I18N.orig.has(n)){ n.nodeValue = src; I18N.orig.delete(n); }
+    return;
+  }
+  if (n.nodeType !== 1 || n.matches("script, style")) return;
+  trAttrs(n);
+  const w = document.createTreeWalker(n, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let c;
+  while ((c = w.nextNode())){
+    if (c.nodeType === 3) trNode(c);
+    else trAttrs(c);
+  }
+}
+function trAttrs(el){
+  for (const a of ["placeholder", "title"]){
+    if (!el.hasAttribute(a)) continue;
+    const key = "data-i18n-" + a;
+    if (I18N.lang === "en"){
+      const v = el.getAttribute(a);
+      if (CYR.test(v)){ const t = tr(v); if (t !== v){ el.setAttribute(key, v); el.setAttribute(a, t); } }
+    } else if (el.hasAttribute(key)){ el.setAttribute(a, el.getAttribute(key)); el.removeAttribute(key); }
+  }
+}
+new MutationObserver(muts => {
+  if (I18N.lang !== "en") return;
+  for (const m of muts){
+    if (m.type === "characterData") trNode(m.target);
+    else if (m.type === "attributes") trAttrs(m.target);
+    else m.addedNodes.forEach(trNode);
+  }
+}).observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["placeholder", "title"] });
+function resolveLang(pref){
+  if (pref === "ru" || pref === "en") return pref;
+  const sys = (navigator.language || "ru").toLowerCase();
+  return /^(ru|uk|be|kk)/.test(sys) ? "ru" : "en";
+}
+function switchLang(pref){
+  applyLang(pref);
+  // Перерисовываем открытые экраны, чтобы числа и даты взяли формат нового языка.
+  if (S.cats && S.cats.length) render();
+  if (S.view === "stats" && S.stats) renderStatsShell();
+  if (S.view === "orders" && S.orders) drawRentals();
+}
+function applyLang(pref){
+  const lang = resolveLang(pref);
+  I18N.lang = lang;
+  document.documentElement.lang = lang;
+  trNode(document.body);
+  if (API) call("set_ui_lang", lang).catch(() => {});
+  $$(".lang-btn").forEach(b => b.classList.toggle("on", b.dataset.lang === lang));
+}
+
 const S = { cats: [], sel: "all", q: "", f: "all", picked: new Set(), games: null, busy: false };
 
 /* ---------- мост к Python ---------- */
@@ -391,6 +493,11 @@ async function doLogin(key, remember){
   finally{ btn.disabled = false; btn.textContent = "Войти"; }
 }
 $("#loginBtn").onclick = () => doLogin($("#key").value, $("#remember").checked);
+$$(".lang-btn").forEach(b => b.onclick = async () => {
+  S.settings = S.settings || {}; S.settings.lang = b.dataset.lang;
+  switchLang(b.dataset.lang);
+  try{ await call("set_setting", "lang", b.dataset.lang); }catch(_){}
+});
 $("#loginCancel").onclick = () => { S.adding = false; $("#loginCancel").classList.add("hidden"); $("#login").classList.add("hidden"); $("#main").classList.remove("hidden"); };
 $("#key").addEventListener("keydown", e => { if (e.key === "Enter") $("#loginBtn").click(); });
 $("#keyShow").onclick = () => { const k = $("#key"); k.type = k.type === "password" ? "text" : "password"; };
@@ -996,13 +1103,19 @@ async function checkUpdate(manual=false){
     const s = $("#updStatus"); if (s) s.textContent = updStatusText();
   }
 }
-const updStatusText = () => S.lastCheck ? `Последняя проверка: ${new Date(S.lastCheck).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}` : "";
+const updStatusText = () => S.lastCheck ? `Последняя проверка: ${new Date(S.lastCheck).toLocaleTimeString(LOC(), { hour: "2-digit", minute: "2-digit" })}` : "";
+// Описание релиза: английская часть, затем «<!-- ru -->» и русская (см. .github/workflows/build.yml).
+function notesFor(notes){
+  if (!notes) return "";
+  const [en, ru] = notes.split("<!-- ru -->");
+  return ((I18N.lang === "ru" && ru) ? ru : en).trim();
+}
 function showUpdate(u){
   const box = $("#upd");
   const mb = u.size ? ` · ${(u.size / 1048576).toFixed(1)} МБ` : "";
   box.innerHTML = `<h4>Доступна версия ${esc(u.latest)}</h4>
     <div class="muted" style="font-size:12.5px">Сейчас установлена ${esc(u.current)}${mb}</div>
-    ${u.notes ? `<div class="notes">${esc(u.notes)}</div>` : '<div style="height:10px"></div>'}
+    ${notesFor(u.notes) ? `<div class="notes">${esc(notesFor(u.notes))}</div>` : '<div style="height:10px"></div>'}
     <div class="bar hidden"><i></i></div>
     <div class="row"><button class="ghost" data-a="skip">Пропустить</button><div class="spacer"></div>
       <button data-a="later">Позже</button>
@@ -1051,6 +1164,10 @@ async function openSettings(section){
     : "Закрытие окна сворачивает приложение в Dock/панель задач. Выход — через меню приложения.";
   bd.innerHTML = `
     <h4 style="margin:0 0 8px">Общие</h4>
+    <div class="field"><label>Язык / Language</label><select data-set="lang">
+      <option value="auto" ${(sg.lang || "auto") === "auto" ? "selected" : ""}>Как в системе / System</option>
+      <option value="ru" ${sg.lang === "ru" ? "selected" : ""} class="notr">Русский</option>
+      <option value="en" ${sg.lang === "en" ? "selected" : ""}>English</option></select></div>
     <div class="field"><label>Тема</label><select data-set="theme">
       <option value="auto" ${sg.theme === "auto" ? "selected" : ""}>Как в системе</option><option value="light" ${sg.theme === "light" ? "selected" : ""}>Светлая</option>
       <option value="dark" ${sg.theme === "dark" ? "selected" : ""}>Тёмная</option></select></div>
@@ -1100,6 +1217,7 @@ async function openSettings(section){
       const saved = await call("set_setting", k, v);
       S.settings[k] = saved;
       if (k === "theme") applyTheme(saved);
+      if (k === "lang") switchLang(saved);
       if (k === "rental_bonus" && S.view === "orders") loadRentals();
       toast("Сохранено");
     }catch(x){ toast(x.message, true); }
@@ -1143,9 +1261,9 @@ function modalBox(title, body, foot, wide=false){
 }
 const fmtLeft = s => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
   return h ? `${h}:${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}` : `${m}:${String(ss).padStart(2, "0")}`; };
-const fmtTime = ts => new Date(ts * 1000).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const fmtTime = ts => new Date(ts * 1000).toLocaleString(LOC(), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const fmtDur = min => !min ? "—" : min % 1440 === 0 ? `${min / 1440} дн.` : min % 60 === 0 ? `${min / 60} ч` : `${min} мин`;
-const money = (obj) => Object.entries(obj || {}).map(([u, v]) => `${(+v).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ${u}`).join(" + ") || "0";
+const money = (obj) => Object.entries(obj || {}).map(([u, v]) => `${(+v).toLocaleString(LOC(), { maximumFractionDigits: 2 })} ${u}`).join(" + ") || "0";
 
 function applyTheme(t){
   if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
@@ -1618,7 +1736,7 @@ function drawChart(data, unit){
   const tip = $("#tip");
   box.querySelectorAll(".hit").forEach(r => {
     r.onmouseenter = () => { const d = data[+r.dataset.i]; const b = box.querySelector(`.bar[data-i="${r.dataset.i}"]`); if (b) b.classList.add("hl");
-      tip.innerHTML = `<b>${d.date.slice(8)}.${d.date.slice(5, 7)}</b> · ${d.v.toLocaleString("ru-RU")} ${esc(unit)}<br>продаж: ${d.n}${d.r ? ` · возвратов: ${d.r}` : ""}`;
+      tip.innerHTML = `<b>${d.date.slice(8)}.${d.date.slice(5, 7)}</b> · ${d.v.toLocaleString(LOC())} ${esc(unit)}<br>продаж: ${d.n}${d.r ? ` · возвратов: ${d.r}` : ""}`;
       const rect = r.getBoundingClientRect(), br = box.getBoundingClientRect();
       tip.style.left = (rect.left - br.left + rect.width / 2) + "px"; tip.style.top = (y(d.v) / H * r.ownerSVGElement.getBoundingClientRect().height + 30) + "px"; tip.style.display = "block"; };
     r.onmouseleave = () => { tip.style.display = "none"; box.querySelectorAll(".bar.hl").forEach(b => b.classList.remove("hl")); };
@@ -1655,6 +1773,7 @@ async function boot(){
     S.skipped = st.skipped;
     S.settings = st.settings || {}; S.tray = st.tray; S.platform = st.platform;
     applyTheme(S.settings.theme);
+    applyLang(S.settings.lang);
     S.version = st.version;
     $("#verBtn").textContent = "⟳ v" + st.version;
     setInterval(pollEvents, 5000);
@@ -1667,7 +1786,9 @@ if (window.pywebview && window.pywebview.api) { API = window.pywebview.api; boot
 else window.addEventListener("pywebviewready", () => { API = window.pywebview.api; boot(); });
 // Режим просмотра в обычном браузере (для разработки): ui/index.html?mock
 if (location.search.includes("mock")) {
-  const s = document.createElement("script"); s.src = "mock.js"; s.onload = () => { API = window.MOCK_API; boot(); };
+  // В приложении словарь встраивается в страницу (app.page_html); в браузере — грузим файл.
+  const s = document.createElement("script"); s.src = "mock.js";
+  s.onload = async () => { API = window.MOCK_API; try{ i18nLoad(await (await fetch("i18n_en.json")).json()); }catch(_){} boot(); };
   document.head.append(s);
 }
 </script>

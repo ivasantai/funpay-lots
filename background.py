@@ -20,8 +20,10 @@ log = logging.getLogger("funpay-lots.bg")
 class Notifier:
     def __init__(self):
         self.tray = None  # pystray.Icon на Windows
+        self.translate = lambda s: s  # Api подставляет перевод на язык интерфейса
 
     def os_notify(self, title: str, text: str):
+        title, text = self.translate(title), self.translate(text)
         try:
             if sys.platform == "win32" and self.tray is not None:
                 self.tray.notify(text[:250], title[:60])
@@ -62,11 +64,11 @@ def start_tray(api, icon_path: str) -> bool:
         api.push_event("check_update", {})  # окно само проверит и покажет результат
 
     menu = pystray.Menu(
-        pystray.MenuItem("Открыть FunPay Lots", show, default=True),
-        pystray.MenuItem("Поднять лоты сейчас", raise_now),
-        pystray.MenuItem("Проверить обновления", check_updates),
+        pystray.MenuItem(lambda item: api._notifier.translate("Открыть FunPay Lots"), show, default=True),
+        pystray.MenuItem(lambda item: api._notifier.translate("Поднять лоты сейчас"), raise_now),
+        pystray.MenuItem(lambda item: api._notifier.translate("Проверить обновления"), check_updates),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem("Выход", quit_app),
+        pystray.MenuItem(lambda item: api._notifier.translate("Выход"), quit_app),
     )
     icon = pystray.Icon("FunPayLots", Image.open(icon_path), "FunPay Lots", menu)
     icon.run_detached()
