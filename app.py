@@ -19,7 +19,7 @@ import updater
 from funpay_client import FunPayClient, FunPayError
 
 APP_NAME = "FunPay Lots"
-VERSION = "1.7.0"
+VERSION = "1.7.1"
 # Для проверки автообновления: FPL_VERSION_OVERRIDE=1.0.0 заставит приложение считать себя старой версией.
 RUNTIME_VERSION = os.environ.get("FPL_VERSION_OVERRIDE") or VERSION
 

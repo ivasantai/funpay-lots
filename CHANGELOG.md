@@ -2,6 +2,13 @@
 
 **English** · [Русский](CHANGELOG.ru.md)
 
+## 1.7.1 — 2026-11-11
+- Cleaner interface: line icons instead of emoji, calm grey surfaces with a single accent colour, even spacing and corner radii, light and dark themes reworked.
+- Prices, amounts, counts and timers use monospaced figures; numbers are formatted the same way everywhere (for example, 412.50 $).
+- Revenue chart: grey bars with the best day of the period highlighted and labelled above the chart.
+- Order and transaction statuses are shown as a coloured dot with text; withdrawals in the history are no longer shown in red.
+- Fixed an empty line inside chat messages.
+
 ## 1.7.0 — 2026-11-10
 - 🌐 English interface: an RU / EN switch on the sign-in screen and in ⚙ → General (defaults to the system language). Error messages, notifications, the tray menu, FunPay dates and statuses are translated too. Content (lot titles, buyer messages, reviews) stays as it is.
 - The release notes in the “Version … is available” card are shown in the interface language.

@@ -70,7 +70,7 @@ The “Remember on this computer” checkbox stores the key locally so the next 
 - Linux: `~/.config/funpay-lots/config.json`
 
 ### Multiple accounts
-Click your nickname in the header: there's the list of accounts (one-click switching), **“＋ Add account”**
+Click your nickname in the header: there's the list of accounts (one-click switching), **“Add account”**
 (opens the sign-in screen; “Cancel” takes you back to the current one) and **“Sign out of …”**, which removes
 the current account's key from this computer. Auto-raise works for every account that has it enabled;
 notifications about orders, messages and rentals are for the account that is currently open.
@@ -81,7 +81,7 @@ notifications about orders, messages and rentals are for the account that is cur
 - On the left — categories where you have lots; on the right — the lots: title, stock, price.
 - **Search** looks in the title, server and lot ID.
 - Filter **All / Active / Inactive**.
-- **⟳** reloads everything from FunPay. Changes made on the site appear after a refresh.
+- **The refresh button** (circular arrows) reloads everything from FunPay. Changes made on the site appear after a refresh.
 
 Inactive lots are greyed out. The app remembers the categories where it has seen your lots, so a category
 doesn't disappear from the list even if all its lots are disabled.
@@ -90,7 +90,7 @@ doesn't disappear from the list even if all its lots are disabled.
 The toggle in the “On” column enables or disables the lot on FunPay right away.
 
 ### Edit
-Click the lot title or ✎. A panel opens with the same fields as on the site: the category's own fields
+Click the lot title or the pencil icon. A panel opens with the same fields as on the site: the category's own fields
 (type, server, etc.), short and detailed description, message to the buyer after payment, price, stock,
 automatic delivery, “Items” for automatic delivery (one per line), “Active”.
 The English versions of the texts are in the “English version” block.
@@ -101,12 +101,12 @@ If FunPay requires them, it will say so in the error after saving.
 ### AI: description and translation
 There are two buttons above the fields in the lot editor (a key is needed, see below):
 
-- **✨ Fill in with AI** — describe the item in a couple of sentences (“rental of ChatGPT Plus for 3 hours,
+- **Fill in with AI** — describe the item in a couple of sentences (“rental of ChatGPT Plus for 3 hours,
   instant delivery, +1 hour for a review”) and click “Generate”. The AI writes the short and detailed
   descriptions, optionally the message to the buyer after payment and the English version right away. It takes
   into account the category, the lot's parameters (type, server…) and the text you already have — it serves as
   an example of your style, and its facts are kept.
-- **🌐 Translate to English** — translates the Russian fields (short and detailed description, message after
+- **Translate to English** — translates the Russian fields (short and detailed description, message after
   payment) into the “English version” block, keeping emoji and line breaks. **Works without a key too** — via
   the free MyMemory translator (see below).
 
@@ -129,17 +129,17 @@ Anthropic account; one description usually costs a fraction of a cent to a coupl
 key” checks the key with a free request. The key is stored in the same `config.json` as the golden_key.
 
 ### Create a lot
-**＋ New lot** → choose a category. Your categories are shown first; start typing a game or category name to
+**New lot** → choose a category. Your categories are shown first; start typing a game or category name to
 search the whole FunPay catalog, or enter a numeric category ID (it's in the address `funpay.com/lots/<ID>/`).
 Fill in the form and click “Create lot”.
 
 Tip: to see how a lot looks, create it with “Active” unchecked — buyers won't see it.
 
 ### Delete
-🗑 in the row or “Delete” in the editor. Deleting is permanent: FunPay has no recycle bin.
+The trash icon in the row or “Delete” in the editor. Deleting is permanent: FunPay has no recycle bin.
 
 ### Duplicate
-⧉ in a lot's row opens the editor for a new copy with all fields of the original lot (texts, parameters,
+The copy icon (two squares) in a lot's row opens the editor for a new copy with all fields of the original lot (texts, parameters,
 price, auto-delivery items, images). Change what you need (e.g. “НА 3 ЧАСА” → “НА 6 ЧАСОВ” and the price) and
 click “Create lot”. Nothing is created until you do.
 
@@ -154,7 +154,7 @@ Tick lots on the left (the checkbox in the header selects all visible ones) — 
 Lots are processed one by one with progress; at the end you see how many were changed, unchanged and failed.
 
 ### Description templates
-In the lot editor — **📋 Templates**. “Save” stores the current texts (short/detailed description, message
+In the lot editor — **Templates**. “Save” stores the current texts (short/detailed description, message
 after payment, RU and EN) under a name; “Apply” puts them into the open lot. Handy for keeping your own
 formatting for new lots and for bulk updates.
 
@@ -167,7 +167,7 @@ formatting for new lots and for bulk updates.
   another account this way: save a backup on one, switch, and restore on the other.
 
 ### Auto-raise
-**⚡ Raise** in the header. Turn on “Raise lots automatically” and tick the categories (all by default).
+**Raise** in the header. Turn on “Raise lots automatically” and tick the categories (all by default).
 The app tries to raise the lots; FunPay answers “raised” or “wait N hours”, and the next attempt is scheduled
 exactly for that time. The table shows the last and next attempt; “Raise” tries right now.
 FunPay raises categories of the same game together. Next to the button you see when the next attempt is.
@@ -180,7 +180,7 @@ The **“Orders”** tab:
 - the list of sales with filters **All / Pending / Closed / Refunds** and search by buyer, number and lot;
   “Show more” loads older ones;
 - click an order to open its card: parameters, amount, review. You can **reply to the review** (the
-  **✨ AI draft** button writes a suggestion — needs an AI key), **open the chat** with the buyer,
+  **AI draft** button writes a suggestion — needs an AI key), **open the chat** with the buyer,
   **refund** (with confirmation; it can't be undone, and the buyer's review may be removed).
 
 ### Rentals
@@ -200,7 +200,7 @@ In ⚙ → “Rental”:
 
 ## Chats
 The **“Chats”** tab: the last 50 conversations on the left (unread ones are marked), the messages on the right.
-Messages refresh every 10 seconds. **Ctrl/⌘+Enter** sends. **✨ AI** writes a reply draft based on the recent
+Messages refresh every 10 seconds. **Ctrl/⌘+Enter** sends. **AI** writes a reply draft based on the recent
 messages; if the field already has text, it's used as a hint (“say I'll deliver in 10 minutes”). The draft is
 never sent by itself — check it and click “Send”.
 
@@ -261,7 +261,7 @@ changes appears in the bottom right:
 You don't need to restart the app to find out about a new version:
 - **automatically** — while the app is running (including in the background), it checks GitHub every 30 minutes;
   you get a notification and the “Update” card. Can be turned off in ⚙ → “Updates”;
-- **manually** — the **⟳ v…** button in the header, **⚙ → “Updates” → “Check now”** (with the time of the last
+- **manually** — the version button (**v…**) in the header, **⚙ → “Updates” → “Check now”** (with the time of the last
   check) or **“Check for updates”** in the tray icon menu (Windows). A manual check also shows a version you
   skipped earlier.
 

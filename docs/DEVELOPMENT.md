@@ -132,9 +132,9 @@ Use an inactive test lot so buyers don't see it:
 4. Save with an empty price — there should be a clear error.
 5. Delete the lot — it disappears from the list.
 6. “Finances”: balances match the site, history loads, filters work.
-7. Editor: “✨ Fill in with AI” and “🌐 Translate” fill in the fields (needs a key in ⚙); nothing is saved by itself.
-   Duplicate (⧉) opens a copy; bulk text/price replacement — on a disabled test lot.
-8. ⚡ Raise: “Raise” in the auto-raise window answers “raised” or “wait N hours”.
+7. Editor: “Fill in with AI” and “Translate” fill in the fields (needs a key in ⚙); nothing is saved by itself.
+   Duplicate (the copy icon) opens a copy; bulk text/price replacement — on a disabled test lot.
+8. Raise: “Raise” in the auto-raise window answers “raised” or “wait N hours”.
 9. Orders, chats and analytics open; check sending messages, refunds and review replies only deliberately — these
    are actions on a real account.
 10. Withdrawal window: “You receive” is calculated; “Next” shows the summary. Confirm a withdrawal only

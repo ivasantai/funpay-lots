@@ -30,12 +30,12 @@ EXACT = {
     # ---------- шапка и вкладки ----------
     "Лоты": "Lots", "Заказы": "Orders", "Чаты": "Chats", "Финансы": "Finances", "Аналитика": "Analytics",
     "Аккаунты": "Accounts", "Настройки": "Settings",
-    "⚡ Поднятие": "⚡ Raise", "Автоподнятие лотов": "Auto-raise lots", "Бэкап и восстановление": "Backup and restore",
-    "＋ Новый лот": "＋ New lot", "Проверить, вышла ли новая версия": "Check whether a new version is out",
+    "Поднятие": "Raise", "Автоподнятие лотов": "Auto-raise lots", "Бэкап и восстановление": "Backup and restore",
+    "Новый лот": "New lot", "Проверить, вышла ли новая версия": "Check whether a new version is out",
     "вкл": "on", "выкл": "off", "сейчас": "now",
-    "＋ Добавить аккаунт": "＋ Add account",
-    "💾 Сохранить бэкап всех лотов…": "💾 Save a backup of all lots…",
-    "📂 Восстановить из бэкапа…": "📂 Restore from backup…",
+    "Добавить аккаунт": "Add account", "Автоподнятие включено": "Auto-raise is on",
+    "Сохранить бэкап всех лотов…": "Save a backup of all lots…",
+    "Восстановить из бэкапа…": "Restore from backup…",
     # ---------- список лотов ----------
     "Все лоты": "All lots", "Разделы": "Categories", "Поиск по названию…": "Search by title…",
     "Все": "All", "Активные": "Active", "Неактивные": "Inactive",
@@ -63,8 +63,8 @@ EXACT = {
         "On the site this field appears depending on other fields",
     "Каждая строка — отдельный товар для автовыдачи.": "Each line is a separate item for automatic delivery.",
     "English version": "English version",
-    "✨ Заполнить с ИИ": "✨ Fill in with AI", "🌐 Перевести на английский": "🌐 Translate to English",
-    "📋 Шаблоны": "📋 Templates", "Что продаёте?": "What are you selling?",
+    "Заполнить с ИИ": "Fill in with AI", "Перевести на английский": "Translate to English",
+    "Шаблоны": "Templates", "Что продаёте?": "What are you selling?",
     "Например: аренда личного аккаунта ChatGPT Plus на 3 часа, выдача сразу после оплаты, +1 час за отзыв. Можно коротко — нейросеть сама оформит текст.":
         "For example: rental of a personal ChatGPT Plus account for 3 hours, delivery right after payment, +1 hour for a review. Keep it short — the AI will write the text.",
     "Учтутся раздел, параметры лота и уже написанный текст (как пример вашего стиля).":
@@ -124,10 +124,10 @@ EXACT = {
     "Разделы одной игры FunPay поднимает вместе.": "FunPay raises categories of the same game together.",
     "Автоподнятие включено": "Auto-raise enabled", "Автоподнятие выключено": "Auto-raise disabled",
     "Лоты подняты": "Lots raised", "Предложения подняты": "Offers raised", "Подождите час.": "Wait an hour.",
-    "Автоподнятие работает, пока приложение запущено. Чтобы оно не выключалось при закрытии окна, включите «Работать в фоне» в ⚙ — окно будет сворачиваться в трей.":
-        "Auto-raise works while the app is running. To keep it going when you close the window, turn on “Run in the background” in ⚙ — the window will go to the tray.",
-    "Автоподнятие работает, пока приложение запущено. Чтобы оно не выключалось при закрытии окна, включите «Работать в фоне» в ⚙ — окно будет сворачиваться.":
-        "Auto-raise works while the app is running. To keep it going when you close the window, turn on “Run in the background” in ⚙ — the window will be minimized.",
+    "Автоподнятие работает, пока приложение запущено. Чтобы оно не выключалось при закрытии окна, включите «Работать в фоне» в настройках — окно будет сворачиваться в трей.":
+        "Auto-raise works while the app is running. To keep it going when you close the window, turn on “Run in the background” in the settings — the window will go to the tray.",
+    "Автоподнятие работает, пока приложение запущено. Чтобы оно не выключалось при закрытии окна, включите «Работать в фоне» в настройках — окно будет сворачиваться.":
+        "Auto-raise works while the app is running. To keep it going when you close the window, turn on “Run in the background” in the settings — the window will be minimized.",
     # ---------- заказы и аренды ----------
     "Аренды": "Rentals", "по заказам с «НА N ЧАСОВ» в названии": "from orders with “FOR N HOURS” in the title",
     "Настроить": "Configure", "Сейчас активных аренд нет.": "No active rentals right now.",
@@ -136,23 +136,23 @@ EXACT = {
     "Дата": "Date", "Заказ": "Order", "Покупатель": "Buyer", "Статус": "Status", "Сумма": "Amount",
     "Заказов нет": "No orders", "Загружаю заказы…": "Loading orders…", "Показать ещё": "Show more",
     "Ожидает": "Pending", "Закрыт": "Closed", "Возврат": "Refund", "Оплачен": "Paid", "Открыт": "Opened",
-    "Заказ →": "Order →", "Добавить:": "Add:", "+30 мин": "+30 min", "+1 ч": "+1 h",
+    "Заказ": "Order", "Добавить:": "Add:", "+30 мин": "+30 min", "+1 ч": "+1 h",
     "Своё значение, можно убавить": "Custom value, can also subtract", "Добавлено вручную": "Added manually",
     "Часы": "Hours", "Минуты": "Minutes", "Убавить, а не добавить": "Subtract instead of adding",
     "«Сбросить» вернёт срок, рассчитанный по названию лота.": "“Reset” returns the duration calculated from the lot title.",
     "Сбросить": "Reset", "Укажите время больше нуля": "Enter a time greater than zero",
     "Покупатель:": "Buyer:", "Отзыв": "Review", "Отзыва нет": "No review",
     "Ответ на отзыв…": "Reply to the review…", "Изменить ответ…": "Edit the reply…",
-    "✨ Черновик ИИ": "✨ AI draft", "Ответить": "Reply", "Обновить ответ": "Update reply",
-    "Вернуть деньги": "Refund", "Вернуть деньги?": "Refund the money?", "На сайте ↗": "On the site ↗",
+    "Черновик ИИ": "AI draft", "Ответить": "Reply", "Обновить ответ": "Update reply",
+    "Вернуть деньги": "Refund", "Вернуть деньги?": "Refund the money?", "На сайте": "On the site", "Онлайн": "Online",
     "Открыть чат": "Open chat", "Деньги возвращены": "Money refunded",
     "Ответ на отзыв опубликован": "Review reply published",
     # ---------- чаты ----------
     "Выберите чат слева": "Select a chat on the left", "Чатов нет": "No chats", "Сообщений нет": "No messages",
     "Сообщение… (Ctrl+Enter — отправить)": "Message… (Ctrl+Enter to send)", "Отправить": "Send",
-    "Черновик ответа нейросетью": "Draft a reply with AI", "✨ ИИ": "✨ AI", "🖼 картинка": "🖼 image",
+    "Черновик ответа нейросетью": "Draft a reply with AI", "ИИ": "AI", "картинка": "image",
     # ---------- финансы ----------
-    "Баланс": "Balance", "Открыть на сайте ↗": "Open on the site ↗", "⟳ Обновить": "⟳ Refresh",
+    "Баланс": "Balance", "Открыть на сайте": "Open on the site", "Обновить данные": "Refresh", "Лучший день": "Best day",
     "Вывести": "Withdraw", "История операций": "Transaction history", "Операция": "Transaction",
     "Операций нет": "No transactions", "Загружаю финансы…": "Loading finances…",
     "Все операции": "All transactions", "Пополнения": "Top-ups", "Выводы": "Withdrawals", "Другое": "Other",
@@ -176,7 +176,7 @@ EXACT = {
     "Лучшие лоты": "Top lots", "Продаж за период нет": "No sales in this period", "Лот": "Lot",
     "Смотрю витрину FunPay…": "Looking at the FunPay storefront…", "Нет разделов с лотами": "No categories with lots",
     "Ваш лот": "Your lot", "Срок": "Duration", "Ваша цена": "Your price", "Место": "Rank", "Мин.": "Min",
-    "Медиана": "Median", "Дешевле всех ▾": "Cheapest ▾", "выключен — нет на витрине": "disabled — not on the storefront",
+    "Медиана": "Median", "Дешевле всех": "Cheapest", "выключен — нет на витрине": "disabled — not on the storefront",
     "нет на витрине": "not on the storefront", "продавец": "seller",
     # ---------- настройки ----------
     "Общие": "General", "Тема": "Theme", "Как в системе": "System", "Светлая": "Light", "Тёмная": "Dark",
@@ -190,7 +190,7 @@ EXACT = {
         "Needed for auto-raise and notifications to keep working while the window is closed.",
     "Горячие клавиши: Ctrl/⌘+1…5 — вкладки, Ctrl/⌘+N — новый лот, Ctrl/⌘+F — поиск, Ctrl/⌘+R — обновить, Esc — закрыть окно.":
         "Hotkeys: Ctrl/⌘+1…5 — tabs, Ctrl/⌘+N — new lot, Ctrl/⌘+F — search, Ctrl/⌘+R — refresh, Esc — close a window.",
-    "Обновления": "Updates", "Установлена версия": "Installed version", "⟳ Проверить сейчас": "⟳ Check now",
+    "Обновления": "Updates", "Установлена версия": "Installed version", "Проверить сейчас": "Check now",
     "Проверять автоматически каждые 30 минут": "Check automatically every 30 minutes",
     "Пока приложение запущено, в том числе в фоне. О новой версии придёт уведомление.":
         "While the app is running, including in the background. You'll get a notification about a new version.",
@@ -204,8 +204,8 @@ EXACT = {
     "Текст сообщения ({buyer} — ник покупателя, {order} — номер заказа)":
         "Message text ({buyer} — buyer's nickname, {order} — order number)",
     "Нейросеть (Claude)": "AI (Claude)",
-    "Нужна для «✨ Заполнить с ИИ» и для качественного перевода. Используется ключ Anthropic API — оплата по факту использования на вашем аккаунте Anthropic (одно описание обычно стоит доли цента–пару центов).":
-        "Needed for “✨ Fill in with AI” and for high-quality translation. Uses an Anthropic API key — pay-as-you-go on your Anthropic account (one description usually costs a fraction of a cent to a couple of cents).",
+    "Нужна для «Заполнить с ИИ» и для качественного перевода. Используется ключ Anthropic API — оплата по факту использования на вашем аккаунте Anthropic (одно описание обычно стоит доли цента–пару центов).":
+        "Needed for “Fill in with AI” and for high-quality translation. Uses an Anthropic API key — pay-as-you-go on your Anthropic account (one description usually costs a fraction of a cent to a couple of cents).",
     "Ключ Anthropic API": "Anthropic API key", "Создать ключ:": "Create a key:",
     ". Хранится только на этом компьютере.": ". Stored only on this computer.",
     "Удалить ключ": "Delete key", "Проверить и сохранить ключ": "Check and save key", "Вставьте ключ": "Paste the key",
